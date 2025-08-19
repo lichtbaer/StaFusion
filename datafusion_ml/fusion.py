@@ -5,7 +5,14 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from .modeling import ProblemType, TrainedModel, detect_problem_type, predict, train_model
+from .modeling import (
+    ProblemType,
+    TrainedModel,
+    detect_problem_type,
+    predict,
+    train_model,
+    cross_validate_metrics,
+)
 
 
 @dataclass
@@ -15,6 +22,8 @@ class FusionResult:
     b_enriched: pd.DataFrame
     models_a_to_b: Dict[str, TrainedModel]
     models_b_to_a: Dict[str, TrainedModel]
+    metrics_a_to_b: Dict[str, Dict[str, float]]
+    metrics_b_to_a: Dict[str, Dict[str, float]]
 
 
 def _infer_overlap_features(
@@ -72,24 +81,29 @@ def fuse_datasets(
 
     # Train models A -> B
     models_a_to_b: Dict[str, TrainedModel] = {}
+    metrics_a_to_b: Dict[str, Dict[str, float]] = {}
     b_pred = df_b.copy()
     for target in targets_from_a:
         y = df_a[target]
         problem = (problem_type_map or {}).get(target) or detect_problem_type(y)
         model = train_model(a_feat, y, problem_type=problem, random_state=random_state, prefer_pycaret=prefer_pycaret)
         models_a_to_b[target] = model
+        # Evaluate via sklearn CV for consistency
+        metrics_a_to_b[target] = cross_validate_metrics(a_feat, y, problem, random_state=random_state)
         preds = predict(model, b_feat)
         col_name = target if target not in b_pred.columns else f"{target}_pred"
         b_pred[col_name] = preds
 
     # Train models B -> A
     models_b_to_a: Dict[str, TrainedModel] = {}
+    metrics_b_to_a: Dict[str, Dict[str, float]] = {}
     a_pred = df_a.copy()
     for target in targets_from_b:
         y = df_b[target]
         problem = (problem_type_map or {}).get(target) or detect_problem_type(y)
         model = train_model(b_feat, y, problem_type=problem, random_state=random_state, prefer_pycaret=prefer_pycaret)
         models_b_to_a[target] = model
+        metrics_b_to_a[target] = cross_validate_metrics(b_feat, y, problem, random_state=random_state)
         preds = predict(model, a_feat)
         col_name = target if target not in a_pred.columns else f"{target}_pred"
         a_pred[col_name] = preds
@@ -107,5 +121,7 @@ def fuse_datasets(
         b_enriched=b_pred,
         models_a_to_b=models_a_to_b,
         models_b_to_a=models_b_to_a,
+        metrics_a_to_b=metrics_a_to_b,
+        metrics_b_to_a=metrics_b_to_a,
     )
 

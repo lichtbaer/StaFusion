@@ -11,6 +11,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.model_selection import cross_validate, StratifiedKFold, KFold
 
 
 ProblemType = Literal["classification", "regression"]
@@ -186,4 +187,51 @@ def predict(model: TrainedModel, X: pd.DataFrame) -> np.ndarray:
         return model.model.predict(X)  # type: ignore[no-any-return]
     else:
         return model.model.predict(X)  # type: ignore[no-any-return]
+
+
+def cross_validate_metrics(
+    X: pd.DataFrame,
+    y: pd.Series,
+    problem_type: ProblemType,
+    random_state: int = 42,
+    cv_splits: int = 3,
+) -> Dict[str, float]:
+    pipeline = build_sklearn_pipeline(X, problem_type, random_state=random_state)
+    if problem_type == "classification":
+        y_non_null = y.dropna()
+        # Ensure sufficient members per class for StratifiedKFold
+        class_counts = y_non_null.value_counts()
+        min_per_class = int(class_counts.min()) if not class_counts.empty else 0
+        splits = min(cv_splits, max(2, min_per_class))
+        if splits < 2:
+            return {}
+        cv = StratifiedKFold(n_splits=splits, shuffle=True, random_state=random_state)
+        scoring = {
+            "accuracy": "accuracy",
+            "f1_macro": "f1_macro",
+            "roc_auc_ovr": "roc_auc_ovr",
+        }
+    else:
+        n_obs = int(y.dropna().shape[0])
+        splits = min(cv_splits, max(2, n_obs))
+        if splits < 2:
+            return {}
+        cv = KFold(n_splits=splits, shuffle=True, random_state=random_state)
+        scoring = {
+            "r2": "r2",
+            "neg_rmse": "neg_root_mean_squared_error",
+            "mae": "neg_mean_absolute_error",
+        }
+    out = cross_validate(pipeline, X, y, cv=cv, scoring=scoring, error_score="raise")
+    metrics: Dict[str, float] = {}
+    for key, values in out.items():
+        if key.startswith("test_"):
+            name = key[len("test_"):]
+            mean_val = float(np.nanmean(values))
+            if name.startswith("neg_"):
+                # flip sign for readability
+                metrics[name[4:]] = -mean_val
+            else:
+                metrics[name] = mean_val
+    return metrics
 
