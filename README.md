@@ -78,3 +78,15 @@ mypy datafusion_ml
 - Ohne gemeinsame Merkmale schlägt die Fusion mit `ValueError` fehl. In diesem Fall `overlap_features` explizit angeben.
 
 - Release auf PyPI: Tag pushen (z. B. `v0.1.0`) und `PYPI_API_TOKEN` als Repo Secret setzen. Workflow `.github/workflows/release.yml` baut und veröffentlicht.
+
+## Pre-commit Hooks
+
+- Setup einmalig:
+```bash
+pip install -e .[dev]
+pre-commit install
+```
+- Manuell ausführen:
+```bash
+pre-commit run --all-files
+```
