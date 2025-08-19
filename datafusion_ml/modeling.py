@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple, Protocol, TypedDict, Union, cast
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from sklearn.compose import ColumnTransformer
@@ -17,6 +18,21 @@ from .config import FusionConfig
 
 
 ProblemType = Literal["classification", "regression"]
+
+
+class PredictorProtocol(Protocol):
+    def predict(self, X: pd.DataFrame) -> npt.NDArray[Any]:
+        ...
+
+class ClassificationMetrics(TypedDict, total=False):
+    accuracy: float
+    f1_macro: float
+    roc_auc_ovr: float
+
+class RegressionMetrics(TypedDict, total=False):
+    r2: float
+    rmse: float
+    mae: float
 
 
 def is_pycaret_available() -> bool:
@@ -183,7 +199,7 @@ def train_model(
     )
 
 
-def predict(model: TrainedModel, X: pd.DataFrame) -> np.ndarray:
+def predict(model: TrainedModel, X: pd.DataFrame) -> npt.NDArray[Any]:
     # Ensure proper list-based column selection (tuple would be a single key)
     X = X[list(model.features)]
     if model.backend == "pycaret":
@@ -197,10 +213,8 @@ def predict(model: TrainedModel, X: pd.DataFrame) -> np.ndarray:
             preds = exp.predict_model(model.model, data=X)
             return preds["prediction_label"].to_numpy()
     # sklearn
-    if model.problem_type == "classification":
-        return model.model.predict(X)  # type: ignore[no-any-return]
-    else:
-        return model.model.predict(X)  # type: ignore[no-any-return]
+    predictor = cast(PredictorProtocol, model.model)
+    return predictor.predict(X)
 
 
 def cross_validate_metrics(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import List, Optional
+from typing import List, Optional, Mapping, Dict, cast
 
 import pandas as pd
 
@@ -65,10 +65,12 @@ def main() -> None:
     # Print a concise metrics summary to stdout
     print("A->B metrics:")
     for target, metrics in result.metrics_a_to_b.items():
-        print(target, {k: round(v, 4) for k, v in metrics.items()})
+        m = cast(Dict[str, float], dict(metrics))
+        print(target, {k: round(val, 4) for k, val in m.items()})
     print("B->A metrics:")
     for target, metrics in result.metrics_b_to_a.items():
-        print(target, {k: round(v, 4) for k, v in metrics.items()})
+        m = cast(Dict[str, float], dict(metrics))
+        print(target, {k: round(val, 4) for k, val in m.items()})
 
     if args.metrics_out:
         import json

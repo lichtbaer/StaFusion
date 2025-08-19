@@ -55,6 +55,8 @@ dev = [
   "pytest-cov>=5.0",
   "ruff>=0.5.0",
   "bandit>=1.7",
+  "pandas-stubs>=2.0",
+  "pre-commit>=3.7",
 ]
 
 [project.scripts]
@@ -72,3 +74,32 @@ target-version = "py311"
 [tool.pytest.ini_options]
 addopts = "-q --disable-warnings"
 
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["sklearn", "sklearn.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pycaret", "pycaret.*"]
+ignore_missing_imports = true

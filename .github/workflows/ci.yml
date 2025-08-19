@@ -29,6 +29,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -e .[dev]
+      - name: Pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit run --all-files --show-diff-on-failure
       - name: Lint
         run: |
           ruff check .

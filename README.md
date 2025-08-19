@@ -64,8 +64,29 @@ pip install -e .[docs]
 mkdocs serve
 ```
 
+## Type Checking
+
+- Lokaler Lauf:
+```bash
+pip install -e .[dev]
+mypy datafusion_ml
+```
+- Hinweis: Für optionale Third-Party-Typen werden Stubs via `dev`-Extras installiert (z. B. `pandas-stubs`). In CI wird `mypy` automatisch ausgeführt.
+
 ## Hinweise & Limitierungen
 - Bei sehr vielen Kategorien in überlappenden Merkmalen empfiehlt sich `use_sparse_onehot=True` (Standard), um Speicher zu sparen.
 - Ohne gemeinsame Merkmale schlägt die Fusion mit `ValueError` fehl. In diesem Fall `overlap_features` explizit angeben.
 
 - Release auf PyPI: Tag pushen (z. B. `v0.1.0`) und `PYPI_API_TOKEN` als Repo Secret setzen. Workflow `.github/workflows/release.yml` baut und veröffentlicht.
+
+## Pre-commit Hooks
+
+- Setup einmalig:
+```bash
+pip install -e .[dev]
+pre-commit install
+```
+- Manuell ausführen:
+```bash
+pre-commit run --all-files
+```
