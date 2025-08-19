@@ -1,0 +1,19 @@
+site_name: datafusion-ml
+site_description: Statistical fusion of two datasets using overlapping features and PyCaret models
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - API: api.md
+  - Tutorials:
+      - Quickstart: tutorials/quickstart.md
+      - Advanced: tutorials/advanced.md
+      - Breast Cancer (sklearn): tutorials/breast_cancer.md
+repo_url: https://example.com/datafusion-ml/repo
+plugins:
+  - search
