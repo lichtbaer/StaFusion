@@ -198,9 +198,9 @@ def predict(model: TrainedModel, X: pd.DataFrame) -> np.ndarray:
             return preds["prediction_label"].to_numpy()
     # sklearn
     if model.problem_type == "classification":
-        return model.model.predict(X)  # type: ignore[no-any-return]
+        return model.model.predict(X)
     else:
-        return model.model.predict(X)  # type: ignore[no-any-return]
+        return model.model.predict(X)
 
 
 def cross_validate_metrics(
