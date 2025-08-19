@@ -32,6 +32,9 @@ jobs:
       - name: Lint
         run: |
           ruff check .
+      - name: Security scan (Bandit)
+        run: |
+          bandit -r . -c bandit.yaml
       - name: Type check
         run: |
           mypy datafusion_ml
