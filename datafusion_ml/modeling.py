@@ -13,6 +13,8 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import cross_validate, StratifiedKFold, KFold
 
+from .config import FusionConfig
+
 
 ProblemType = Literal["classification", "regression"]
 
@@ -43,8 +45,11 @@ def detect_problem_type(target_series: pd.Series) -> ProblemType:
 def build_sklearn_pipeline(
     X: pd.DataFrame,
     problem_type: ProblemType,
-    random_state: int = 42,
+    *,
+    config: Optional[FusionConfig] = None,
 ) -> Pipeline:
+    if config is None:
+        config = FusionConfig()
     categorical_cols = [c for c in X.columns if not pd.api.types.is_numeric_dtype(X[c])]
     numeric_cols = [c for c in X.columns if pd.api.types.is_numeric_dtype(X[c])]
 
@@ -53,7 +58,10 @@ def build_sklearn_pipeline(
             ("imputer", SimpleImputer(strategy="most_frequent")),
             (
                 "onehot",
-                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                OneHotEncoder(
+                    handle_unknown="ignore",
+                    sparse_output=config.use_sparse_onehot,
+                ),
             ),
         ]
     )
@@ -72,9 +80,13 @@ def build_sklearn_pipeline(
     )
 
     if problem_type == "classification":
-        model = RandomForestClassifier(n_estimators=300, random_state=random_state)
+        model = RandomForestClassifier(
+            n_estimators=config.n_estimators, random_state=config.random_state
+        )
     else:
-        model = RandomForestRegressor(n_estimators=300, random_state=random_state)
+        model = RandomForestRegressor(
+            n_estimators=config.n_estimators, random_state=config.random_state
+        )
 
     pipeline: Pipeline = Pipeline(
         steps=[
@@ -99,15 +111,17 @@ def train_model(
     X: pd.DataFrame,
     y: pd.Series,
     problem_type: Optional[ProblemType] = None,
-    random_state: int = 42,
-    prefer_pycaret: bool = True,
+    *,
+    config: Optional[FusionConfig] = None,
 ) -> TrainedModel:
+    if config is None:
+        config = FusionConfig()
     if problem_type is None:
         problem_type = detect_problem_type(y)
 
     features = tuple(X.columns.tolist())
 
-    if prefer_pycaret and is_pycaret_available():
+    if config.prefer_pycaret and is_pycaret_available():
         if problem_type == "classification":
             from pycaret.classification import ClassificationExperiment
 
@@ -117,8 +131,8 @@ def train_model(
             exp.setup(
                 data=data,
                 target=y.name,
-                session_id=random_state,
-                fold=3,
+                session_id=config.random_state,
+                fold=config.cv_splits,
                 verbose=False,
                 html=False,
             )
@@ -141,8 +155,8 @@ def train_model(
             exp.setup(
                 data=data,
                 target=y.name,
-                session_id=random_state,
-                fold=3,
+                session_id=config.random_state,
+                fold=config.cv_splits,
                 verbose=False,
                 html=False,
             )
@@ -158,7 +172,7 @@ def train_model(
             )
 
     # sklearn fallback
-    pipeline = build_sklearn_pipeline(X, problem_type, random_state=random_state)
+    pipeline = build_sklearn_pipeline(X, problem_type, config=config)
     pipeline.fit(X, y)
     return TrainedModel(
         problem_type=problem_type,
@@ -193,19 +207,23 @@ def cross_validate_metrics(
     X: pd.DataFrame,
     y: pd.Series,
     problem_type: ProblemType,
-    random_state: int = 42,
-    cv_splits: int = 3,
+    *,
+    config: Optional[FusionConfig] = None,
 ) -> Dict[str, float]:
-    pipeline = build_sklearn_pipeline(X, problem_type, random_state=random_state)
+    if config is None:
+        config = FusionConfig()
+    pipeline = build_sklearn_pipeline(X, problem_type, config=config)
     if problem_type == "classification":
         y_non_null = y.dropna()
         # Ensure sufficient members per class for StratifiedKFold
         class_counts = y_non_null.value_counts()
         min_per_class = int(class_counts.min()) if not class_counts.empty else 0
-        splits = min(cv_splits, max(2, min_per_class))
+        splits = min(config.cv_splits, max(2, min_per_class))
         if splits < 2:
             return {}
-        cv = StratifiedKFold(n_splits=splits, shuffle=True, random_state=random_state)
+        cv = StratifiedKFold(
+            n_splits=splits, shuffle=True, random_state=config.random_state
+        )
         scoring = {
             "accuracy": "accuracy",
             "f1_macro": "f1_macro",
@@ -213,16 +231,16 @@ def cross_validate_metrics(
         }
     else:
         n_obs = int(y.dropna().shape[0])
-        splits = min(cv_splits, max(2, n_obs))
+        splits = min(config.cv_splits, max(2, n_obs))
         if splits < 2:
             return {}
-        cv = KFold(n_splits=splits, shuffle=True, random_state=random_state)
+        cv = KFold(n_splits=splits, shuffle=True, random_state=config.random_state)
         scoring = {
             "r2": "r2",
             "neg_rmse": "neg_root_mean_squared_error",
             "mae": "neg_mean_absolute_error",
         }
-    out = cross_validate(pipeline, X, y, cv=cv, scoring=scoring, error_score="raise")
+    out = cross_validate(pipeline, X, y, cv=cv, scoring=scoring, error_score=np.nan)
     metrics: Dict[str, float] = {}
     for key, values in out.items():
         if key.startswith("test_"):

@@ -19,6 +19,7 @@ python -m pip install pycaret==3.3.2
 ```python
 import pandas as pd
 from datafusion_ml.fusion import fuse_datasets
+from datafusion_ml.config import FusionConfig
 
 # Beispiel-Daten
 A = pd.DataFrame({
@@ -35,10 +36,8 @@ B = pd.DataFrame({
     "numeric_only_in_B": [3.2, 1.5, 2.7, 4.1],  # z. B. Regression
 })
 
-result = fuse_datasets(
-    df_a=A,
-    df_b=B,
-)
+cfg = FusionConfig(use_sparse_onehot=True, cv_splits=3, n_estimators=200)
+result = fuse_datasets(df_a=A, df_b=B, config=cfg)
 
 print(result.fused.shape)
 print(result.a_enriched.columns)
@@ -64,5 +63,9 @@ PYTHONPATH=. pytest -q
 pip install -e .[docs]
 mkdocs serve
 ```
+
+## Hinweise & Limitierungen
+- Bei sehr vielen Kategorien in überlappenden Merkmalen empfiehlt sich `use_sparse_onehot=True` (Standard), um Speicher zu sparen.
+- Ohne gemeinsame Merkmale schlägt die Fusion mit `ValueError` fehl. In diesem Fall `overlap_features` explizit angeben.
 
 - Release auf PyPI: Tag pushen (z. B. `v0.1.0`) und `PYPI_API_TOKEN` als Repo Secret setzen. Workflow `.github/workflows/release.yml` baut und veröffentlicht.
