@@ -1,5 +1,9 @@
 # datafusion-ml
 
+[![CI](https://img.shields.io/github/actions/workflow/status/ORG/REPO/ci.yml?branch=main)](https://github.com/ORG/REPO/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs--material-blue)](https://ORG.github.io/REPO/)
+[![PyPI](https://img.shields.io/pypi/v/datafusion-ml.svg)](https://pypi.org/project/datafusion-ml/)
+
 Bibliothek für statistische Fusion zweier Datensätze auf Basis überlappender Merkmale. Die Bibliothek nutzt PyCaret zur Modellierung (Klassifikation/Regression), um fehlende Variablen aus Datensatz A in B (und umgekehrt) vorherzusagen und die Datensätze zu einem gemeinsamen, angereicherten Datensatz zu vereinen.
 
 ## Installation
@@ -47,3 +51,18 @@ print(result.b_enriched.columns)
 
 ## Lizenz
 MIT
+
+## Development
+
+- Tests lokal:
+```bash
+PYTHONPATH=. pytest -q
+```
+
+- Docs lokal:
+```bash
+pip install -e .[docs]
+mkdocs serve
+```
+
+- Release auf PyPI: Tag pushen (z. B. `v0.1.0`) und `PYPI_API_TOKEN` als Repo Secret setzen. Workflow `.github/workflows/release.yml` baut und veröffentlicht.
