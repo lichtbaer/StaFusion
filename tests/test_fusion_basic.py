@@ -45,7 +45,6 @@ def test_no_overlap_raises():
 def test_cli_smoke(tmp_path):
     from subprocess import run
     import sys
-    import os
 
     A = pd.DataFrame({
         "age": [1, 2, 3],

@@ -1,8 +1,6 @@
-import os
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 from sklearn.datasets import load_breast_cancer
 
 
@@ -41,4 +39,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
