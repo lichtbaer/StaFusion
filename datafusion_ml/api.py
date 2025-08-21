@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from pydantic import BaseModel, Field
 
 from .config import FusionConfig
 from .fusion import fuse_datasets
+from .errors import OverlapError, TargetsError, ConfigurationError
 
 
 class FuseRequest(BaseModel):
@@ -30,25 +31,33 @@ class FuseRequest(BaseModel):
     use_sparse_onehot: Optional[bool] = Field(default=True)
     max_category_cardinality: Optional[int] = Field(default=100)
     warn_on_high_cardinality: Optional[bool] = Field(default=True)
+    # API shaping
+    return_parts: Optional[List[str]] = Field(
+        default=None, description="Which parts to return: fused, a_enriched, b_enriched, metrics"
+    )
+    row_limit: Optional[int] = Field(default=None, ge=0)
+    columns_include: Optional[List[str]] = Field(default=None)
+    columns_exclude: Optional[List[str]] = Field(default=None)
 
 
 class FuseResponse(BaseModel):
-    fused: List[Dict[str, Any]]
-    a_enriched: List[Dict[str, Any]]
-    b_enriched: List[Dict[str, Any]]
-    metrics_a_to_b: Dict[str, Dict[str, float]]
-    metrics_b_to_a: Dict[str, Dict[str, float]]
+    fused: Optional[List[Dict[str, Any]]] = None
+    a_enriched: Optional[List[Dict[str, Any]]] = None
+    b_enriched: Optional[List[Dict[str, Any]]] = None
+    metrics_a_to_b: Optional[Dict[str, Dict[str, float]]] = None
+    metrics_b_to_a: Optional[Dict[str, Dict[str, float]]] = None
 
 
 app = FastAPI(title="datafusion-ml API", version="0.1.0")
+router = APIRouter(prefix="/v1")
 
 
-@app.get("/health")
+@router.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/fuse", response_model=FuseResponse)
+@router.post("/fuse", response_model=FuseResponse)
 def fuse(req: FuseRequest) -> FuseResponse:
     try:
         df_a = pd.DataFrame.from_records(req.df_a)
@@ -80,18 +89,55 @@ def fuse(req: FuseRequest) -> FuseResponse:
             random_state=req.random_state if req.random_state is not None else 42,
             config=config,
         )
+        # Select parts
+        wanted = set(req.return_parts or ["fused", "a_enriched", "b_enriched", "metrics"])
 
-        return FuseResponse(
-            fused=result.fused.to_dict(orient="records"),
-            a_enriched=result.a_enriched.to_dict(orient="records"),
-            b_enriched=result.b_enriched.to_dict(orient="records"),
-            metrics_a_to_b={k: dict(v) for k, v in result.metrics_a_to_b.items()},
-            metrics_b_to_a={k: dict(v) for k, v in result.metrics_b_to_a.items()},
-        )
-    except ValueError as e:
+        def maybe_filter(df: pd.DataFrame) -> pd.DataFrame:
+            out = df
+            if req.columns_include:
+                cols = [c for c in req.columns_include if c in out.columns]
+                if cols:
+                    out = out[cols]
+            if req.columns_exclude:
+                drop_cols = [c for c in req.columns_exclude if c in out.columns]
+                if drop_cols:
+                    out = out.drop(columns=drop_cols)
+            if req.row_limit is not None:
+                out = out.head(req.row_limit)
+            return out
+
+        response = FuseResponse()
+        if "fused" in wanted:
+            response.fused = maybe_filter(result.fused).to_dict(orient="records")
+        if "a_enriched" in wanted:
+            response.a_enriched = maybe_filter(result.a_enriched).to_dict(orient="records")
+        if "b_enriched" in wanted:
+            response.b_enriched = maybe_filter(result.b_enriched).to_dict(orient="records")
+        if "metrics" in wanted:
+            def _clean(d: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+                out: Dict[str, Dict[str, float]] = {}
+                for k, sub in d.items():
+                    out[k] = {mk: float(mv) for mk, mv in sub.items() if mv == mv}
+                return out
+            response.metrics_a_to_b = _clean({k: dict(v) for k, v in result.metrics_a_to_b.items()})
+            response.metrics_b_to_a = _clean({k: dict(v) for k, v in result.metrics_b_to_a.items()})
+        return response
+    except OverlapError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except TargetsError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ConfigurationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {e}")
+
+
+app.include_router(router)
+
+
+# Backwards-compatible unversioned routes
+app.get("/health")(health)
+app.post("/fuse")(fuse)
 
 
 def main() -> None:

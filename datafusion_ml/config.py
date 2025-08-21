@@ -18,6 +18,7 @@ class FusionConfig:
     # Modeling
     cv_splits: int = 3
     n_estimators: int = 300
+    n_jobs: int = 1
     use_sparse_onehot: bool = True
 
     # Safety/performance

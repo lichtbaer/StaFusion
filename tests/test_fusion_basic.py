@@ -35,11 +35,10 @@ def test_basic_fusion_runs():
 def test_no_overlap_raises():
     A = pd.DataFrame({"a": [1, 2, 3], "y": [0, 1, 0]})
     B = pd.DataFrame({"b": [1, 2, 3], "x": [0.1, 0.2, 0.3]})
-    try:
+    import pytest
+    from datafusion_ml.errors import OverlapError
+    with pytest.raises(OverlapError):
         fuse_datasets(df_a=A, df_b=B, prefer_pycaret=False)
-        assert False, "Expected ValueError due to no overlap"
-    except ValueError:
-        pass
 
 
 def test_cli_smoke(tmp_path):

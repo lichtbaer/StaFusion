@@ -15,8 +15,10 @@ from .modeling import (
     cross_validate_metrics,
     ClassificationMetrics,
     RegressionMetrics,
+    get_trainer,
 )
 from .config import FusionConfig
+from .errors import OverlapError, TargetsError
 
 
 @dataclass
@@ -86,7 +88,9 @@ def fuse_datasets(
         overlap_features = [c for c in overlap_features if c in df_a.columns and c in df_b.columns]
 
     if len(overlap_features) == 0:
-        raise ValueError("No overlapping features between A and B (after exclusions). Provide overlap_features explicitly or ensure datasets share columns.")
+        raise OverlapError(
+            "No overlapping features between A and B (after exclusions). Provide overlap_features explicitly or ensure datasets share columns."
+        )
 
     if targets_from_a is None:
         targets_from_a = _exclusive_columns(df_a, df_b)
@@ -94,7 +98,9 @@ def fuse_datasets(
         targets_from_b = _exclusive_columns(df_b, df_a)
 
     if not targets_from_a and not targets_from_b:
-        raise ValueError("No exclusive target columns detected in either dataset. Specify targets_from_a/targets_from_b.")
+        raise TargetsError(
+            "No exclusive target columns detected in either dataset. Specify targets_from_a/targets_from_b."
+        )
 
     # Align categorical levels across overlap features
     a_feat, b_feat = _coerce_categorical_alignment(
@@ -114,14 +120,16 @@ def fuse_datasets(
                         config.max_category_cardinality,
                     )
 
+    trainer = get_trainer(config)
+
     # Train models A -> B
     models_a_to_b: Dict[str, TrainedModel] = {}
     metrics_a_to_b: Dict[str, ClassificationMetrics | RegressionMetrics] = {}
     b_pred = df_b.copy()
     for target in targets_from_a:
         y = df_a[target]
-        problem = (problem_type_map or {}).get(target) or detect_problem_type(y)
-        model = train_model(a_feat, y, problem_type=problem, config=config)
+        problem = (problem_type_map or {}).get(target) or trainer.infer_problem_type(y)
+        model = trainer.train(a_feat, y, problem_type=problem, config=config)
         models_a_to_b[target] = model
         # Evaluate via sklearn CV for consistency
         metrics_a_to_b[target] = cast(ClassificationMetrics | RegressionMetrics, cross_validate_metrics(a_feat, y, problem, config=config))
@@ -135,8 +143,8 @@ def fuse_datasets(
     a_pred = df_a.copy()
     for target in targets_from_b:
         y = df_b[target]
-        problem = (problem_type_map or {}).get(target) or detect_problem_type(y)
-        model = train_model(b_feat, y, problem_type=problem, config=config)
+        problem = (problem_type_map or {}).get(target) or trainer.infer_problem_type(y)
+        model = trainer.train(b_feat, y, problem_type=problem, config=config)
         models_b_to_a[target] = model
         metrics_b_to_a[target] = cast(ClassificationMetrics | RegressionMetrics, cross_validate_metrics(b_feat, y, problem, config=config))
         preds = predict(model, a_feat)

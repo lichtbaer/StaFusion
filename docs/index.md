@@ -20,10 +20,10 @@ pip install -r requirements.txt
 ```bash
 pip install -e .[api]
 datafusion-ml-api
-# -> verfügbar unter http://localhost:8000
+# -> verfügbar unter http://localhost:8000 (Versioniert unter /v1)
 ```
 
-POST /fuse akzeptiert zwei Datensätze als Listen von Records (JSON) und liefert
+POST /v1/fuse akzeptiert zwei Datensätze als Listen von Records (JSON) und liefert
 angereicherte DataFrames sowie Metriken zurück. Beispiel-Body:
 
 ```json
@@ -33,4 +33,9 @@ angereicherte DataFrames sowie Metriken zurück. Beispiel-Body:
   "prefer_pycaret": false
 }
 ```
+
+Optionale Felder:
+- return_parts: z. B. ["fused"], um nur Teilantworten zu erhalten
+- row_limit: begrenzt Reihen in den zurückgegebenen DataFrames
+- columns_include/columns_exclude: Spaltenauswahl
 
