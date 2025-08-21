@@ -45,6 +45,10 @@ Issues = "https://example.com/datafusion-ml/issues"
 ml = [
   "pycaret==3.3.2"
 ]
+api = [
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.30"
+]
 docs = [
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",
@@ -61,6 +65,7 @@ dev = [
 
 [project.scripts]
 datafusion-ml = "datafusion_ml.cli:main"
+datafusion-ml-api = "datafusion_ml.api:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
