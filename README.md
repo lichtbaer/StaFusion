@@ -14,6 +14,33 @@ python -m pip install -r requirements.txt
 python -m pip install pycaret==3.3.2
 ```
 
+### Option: Microservice-API mit FastAPI
+
+```bash
+# Optionales Extra installieren (Entwicklung):
+pip install -e .[api]
+
+# oder direkt die Laufzeit-Dependencies:
+pip install fastapi uvicorn[standard]
+
+# Server starten
+datafusion-ml-api  # läuft standardmäßig auf http://0.0.0.0:8000
+```
+
+Beispielanfrage:
+
+```bash
+curl -s -X POST http://localhost:8000/v1/fuse \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "df_a": [{"age_group": "18-29", "x_only_in_a": 1}],
+        "df_b": [{"age_group": "18-29", "y_only_in_b": 3.2}],
+        "prefer_pycaret": false,
+        "return_parts": ["fused"],
+        "row_limit": 10
+      }' | jq '.fused | length'
+```
+
 ## Quickstart
 
 ```python

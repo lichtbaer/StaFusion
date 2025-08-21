@@ -97,11 +97,15 @@ def build_sklearn_pipeline(
 
     if problem_type == "classification":
         model = RandomForestClassifier(
-            n_estimators=config.n_estimators, random_state=config.random_state
+            n_estimators=config.n_estimators,
+            random_state=config.random_state,
+            n_jobs=config.n_jobs,
         )
     else:
         model = RandomForestRegressor(
-            n_estimators=config.n_estimators, random_state=config.random_state
+            n_estimators=config.n_estimators,
+            random_state=config.random_state,
+            n_jobs=config.n_jobs,
         )
 
     pipeline: Pipeline = Pipeline(
@@ -123,21 +127,49 @@ class TrainedModel:
     extra: Optional[Dict[str, Any]] = None
 
 
-def train_model(
-    X: pd.DataFrame,
-    y: pd.Series,
-    problem_type: Optional[ProblemType] = None,
-    *,
-    config: Optional[FusionConfig] = None,
-) -> TrainedModel:
-    if config is None:
-        config = FusionConfig()
-    if problem_type is None:
-        problem_type = detect_problem_type(y)
+class ModelTrainer(Protocol):
+    def train(
+        self, X: pd.DataFrame, y: pd.Series, problem_type: Optional[ProblemType], *, config: Optional[FusionConfig]
+    ) -> "TrainedModel":
+        ...
 
-    features = tuple(X.columns.tolist())
+    def infer_problem_type(self, y: pd.Series) -> ProblemType:
+        ...
 
-    if config.prefer_pycaret and is_pycaret_available():
+
+class SklearnTrainer:
+    def train(
+        self, X: pd.DataFrame, y: pd.Series, problem_type: Optional[ProblemType] = None, *, config: Optional[FusionConfig] = None
+    ) -> "TrainedModel":
+        if config is None:
+            config = FusionConfig()
+        if problem_type is None:
+            problem_type = detect_problem_type(y)
+        features = tuple(X.columns.tolist())
+        pipeline = build_sklearn_pipeline(X, problem_type, config=config)
+        pipeline.fit(X, y)
+        return TrainedModel(
+            problem_type=problem_type,
+            model=pipeline,
+            backend="sklearn",
+            target=y.name,
+            features=features,
+        )
+
+    def infer_problem_type(self, y: pd.Series) -> ProblemType:
+        return detect_problem_type(y)
+
+
+class PyCaretTrainer:
+    def train(
+        self, X: pd.DataFrame, y: pd.Series, problem_type: Optional[ProblemType] = None, *, config: Optional[FusionConfig] = None
+    ) -> "TrainedModel":
+        if config is None:
+            config = FusionConfig()
+        if problem_type is None:
+            problem_type = detect_problem_type(y)
+
+        features = tuple(X.columns.tolist())
         if problem_type == "classification":
             from pycaret.classification import ClassificationExperiment
 
@@ -187,16 +219,26 @@ def train_model(
                 extra={"experiment": exp},
             )
 
-    # sklearn fallback
-    pipeline = build_sklearn_pipeline(X, problem_type, config=config)
-    pipeline.fit(X, y)
-    return TrainedModel(
-        problem_type=problem_type,
-        model=pipeline,
-        backend="sklearn",
-        target=y.name,
-        features=features,
-    )
+    def infer_problem_type(self, y: pd.Series) -> ProblemType:
+        return detect_problem_type(y)
+
+
+def get_trainer(config: Optional[FusionConfig]) -> ModelTrainer:
+    cfg = config or FusionConfig()
+    if cfg.prefer_pycaret and is_pycaret_available():
+        return PyCaretTrainer()
+    return SklearnTrainer()
+
+
+def train_model(
+    X: pd.DataFrame,
+    y: pd.Series,
+    problem_type: Optional[ProblemType] = None,
+    *,
+    config: Optional[FusionConfig] = None,
+) -> TrainedModel:
+    trainer = get_trainer(config)
+    return trainer.train(X, y, problem_type, config=config)
 
 
 def predict(model: TrainedModel, X: pd.DataFrame) -> npt.NDArray[Any]:
@@ -254,7 +296,9 @@ def cross_validate_metrics(
             "neg_rmse": "neg_root_mean_squared_error",
             "mae": "neg_mean_absolute_error",
         }
-    out = cross_validate(pipeline, X, y, cv=cv, scoring=scoring, error_score=np.nan)
+    out = cross_validate(
+        pipeline, X, y, cv=cv, scoring=scoring, error_score=np.nan, n_jobs=config.n_jobs
+    )
     metrics: Dict[str, float] = {}
     for key, values in out.items():
         if key.startswith("test_"):

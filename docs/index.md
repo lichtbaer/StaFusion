@@ -15,3 +15,27 @@ pip install datafusion-ml  # when published
 pip install -r requirements.txt
 ```
 
+### Optional: FastAPI Microservice
+
+```bash
+pip install -e .[api]
+datafusion-ml-api
+# -> verfügbar unter http://localhost:8000 (Versioniert unter /v1)
+```
+
+POST /v1/fuse akzeptiert zwei Datensätze als Listen von Records (JSON) und liefert
+angereicherte DataFrames sowie Metriken zurück. Beispiel-Body:
+
+```json
+{
+  "df_a": [{"age_group": "18-29", "x_only_in_a": 1}],
+  "df_b": [{"age_group": "18-29", "y_only_in_b": 3.2}],
+  "prefer_pycaret": false
+}
+```
+
+Optionale Felder:
+- return_parts: z. B. ["fused"], um nur Teilantworten zu erhalten
+- row_limit: begrenzt Reihen in den zurückgegebenen DataFrames
+- columns_include/columns_exclude: Spaltenauswahl
+
