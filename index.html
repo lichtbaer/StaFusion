@@ -270,6 +270,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="datafusion-ml">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-fastapi-microservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional: FastAPI Microservice
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -482,6 +497,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="datafusion-ml">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-fastapi-microservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      Optional: FastAPI Microservice
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -514,6 +544,23 @@
 # or for development
 pip install -r requirements.txt
 </code></pre>
+<h3 id="optional-fastapi-microservice">Optional: FastAPI Microservice</h3>
+<pre><code class="language-bash">pip install -e .[api]
+datafusion-ml-api
+# -&gt; verfügbar unter http://localhost:8000 (Versioniert unter /v1)
+</code></pre>
+<p>POST /v1/fuse akzeptiert zwei Datensätze als Listen von Records (JSON) und liefert
+angereicherte DataFrames sowie Metriken zurück. Beispiel-Body:</p>
+<pre><code class="language-json">{
+  &quot;df_a&quot;: [{&quot;age_group&quot;: &quot;18-29&quot;, &quot;x_only_in_a&quot;: 1}],
+  &quot;df_b&quot;: [{&quot;age_group&quot;: &quot;18-29&quot;, &quot;y_only_in_b&quot;: 3.2}],
+  &quot;prefer_pycaret&quot;: false
+}
+</code></pre>
+<p>Optionale Felder:
+- return_parts: z. B. ["fused"], um nur Teilantworten zu erhalten
+- row_limit: begrenzt Reihen in den zurückgegebenen DataFrames
+- columns_include/columns_exclude: Spaltenauswahl</p>
 
 
 
