@@ -41,6 +41,58 @@ curl -s -X POST http://localhost:8000/v1/fuse \
       }' | jq '.fused | length'
 ```
 
+#### Datei-Upload
+
+```bash
+# CSV oder Parquet möglich (multipart/form-data)
+curl -s -X POST http://localhost:8000/v1/fuse/upload \
+  -F file_a=@A.csv \
+  -F file_b=@B.parquet | jq '.fused | length'
+```
+
+#### Asynchrone Verarbeitung
+
+```bash
+JOB=$(curl -s -X POST http://localhost:8000/v1/fuse/async -H 'Content-Type: application/json' -d @payload.json | jq -r .job_id)
+# Status pollen
+curl -s http://localhost:8000/v1/fuse/async/$JOB | jq
+```
+
+#### Metriken & Health
+
+- Health: `GET /v1/health`
+- Prometheus: `GET /metrics`
+
+### Docker (PyCaret standardmäßig enthalten)
+
+```bash
+# Image bauen
+docker build -t datafusion-ml-api .
+
+# Starten
+docker run --rm -p 8000:8000 \
+  -e DFML_LOG_LEVEL=INFO \
+  -e DFML_LOG_FORMAT=json \
+  -e DFML_CORS_ENABLED=true \
+  -e DFML_MAX_BODY_MB=50 \
+  -e DFML_MAX_ROWS=200000 \
+  datafusion-ml-api
+```
+
+### Konfiguration (Environment-Variablen, Prefix `DFML_`)
+
+- `CORS_ENABLED` (bool, Default: `true`)
+- `CORS_ORIGINS` (CSV-Liste, Default: `*`)
+- `CORS_ALLOW_CREDENTIALS` (bool, Default: `false`)
+- `CORS_ALLOW_METHODS` (CSV-Liste, Default: `*`)
+- `CORS_ALLOW_HEADERS` (CSV-Liste, Default: `*`)
+- `ENABLE_METRICS` (bool, Default: `true`)
+- `ENABLE_UNVERSIONED_ROUTES` (bool, Default: `true`)
+- `MAX_BODY_MB` (int, Default: `50`)
+- `MAX_ROWS` (int, Default: `200000`)
+- `LOG_LEVEL` (`DEBUG|INFO|...`, Default: `INFO`)
+- `LOG_FORMAT` (`json|plain`, Default: `json`)
+
 ## Quickstart
 
 ```python
