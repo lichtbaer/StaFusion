@@ -30,10 +30,19 @@ export type AppState = {
   result?: FuseResponse;
   loading: boolean;
   error?: string;
+  // async
+  jobId?: string;
+  jobStatus?: 'pending' | 'done' | 'error';
   setFiles: (a?: File, b?: File) => void;
   setSettings: (s: Partial<AppSettings>) => void;
   resetResult: () => void;
   runUploadFusion: () => Promise<void>;
+  runAsyncJson: (payload: { df_a: any[]; df_b: any[] } & AppSettings) => Promise<void>;
+  pollJob: () => Promise<void>;
+  clearJob: () => void;
+  // config
+  exportConfig: () => string;
+  importConfig: (json: string) => void;
 };
 
 const AppStateContext = React.createContext<AppState | undefined>(undefined);
@@ -46,6 +55,8 @@ export const AppStateProvider: React.FC<React.PropsWithChildren<{ runtime: Runti
   const [result, setResult] = React.useState<FuseResponse | undefined>(undefined);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>(undefined);
+  const [jobId, setJobId] = React.useState<string | undefined>(undefined);
+  const [jobStatus, setJobStatus] = React.useState<'pending' | 'done' | 'error' | undefined>(undefined);
 
   const setFiles = (a?: File, b?: File) => { setFileA(a); setFileB(b); };
   const setSettings = (s: Partial<AppSettings>) => { setSettingsState(prev => ({ ...prev, ...s })); };
@@ -76,6 +87,63 @@ export const AppStateProvider: React.FC<React.PropsWithChildren<{ runtime: Runti
     }
   };
 
+  const runAsyncJson = async (payload: { df_a: any[]; df_b: any[] } & AppSettings) => {
+    setLoading(true); setError(undefined); setResult(undefined);
+    try {
+      const body = {
+        df_a: payload.df_a,
+        df_b: payload.df_b,
+        overlap_features: payload.overlap_features ?? undefined,
+        targets_from_a: payload.targets_from_a ?? undefined,
+        targets_from_b: payload.targets_from_b ?? undefined,
+        prefer_pycaret: payload.prefer_pycaret,
+        random_state: payload.random_state,
+        return_parts: undefined,
+        row_limit: payload.row_limit ?? undefined,
+        columns_include: payload.columns_include ?? undefined,
+        columns_exclude: payload.columns_exclude ?? undefined,
+      };
+      const res = await client.startAsync(body as any);
+      const id = (res as any).job_id as string;
+      setJobId(id);
+      setJobStatus('pending');
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pollJob = async () => {
+    if (!jobId) return;
+    try {
+      const data = await client.getJob(jobId);
+      const status = (data as any).status as 'pending' | 'done' | 'error';
+      setJobStatus(status);
+      if (status === 'done') {
+        setResult((data as any).result as FuseResponse);
+      } else if (status === 'error') {
+        setError((data as any).error || 'Unknown error');
+      }
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    }
+  };
+
+  const clearJob = () => { setJobId(undefined); setJobStatus(undefined); };
+
+  const exportConfig = () => {
+    const cfg = { settings };
+    return JSON.stringify(cfg, null, 2);
+  };
+
+  const importConfig = (json: string) => {
+    const cfg = JSON.parse(json);
+    if (cfg && typeof cfg === 'object' && cfg.settings) {
+      setSettingsState((prev) => ({ ...prev, ...cfg.settings }));
+    }
+  };
+
   const value: AppState = {
     runtime,
     client,
@@ -85,10 +153,17 @@ export const AppStateProvider: React.FC<React.PropsWithChildren<{ runtime: Runti
     result,
     loading,
     error,
+    jobId,
+    jobStatus,
     setFiles,
     setSettings,
     resetResult,
-    runUploadFusion
+    runUploadFusion,
+    runAsyncJson,
+    pollJob,
+    clearJob,
+    exportConfig,
+    importConfig
   };
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

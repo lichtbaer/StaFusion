@@ -41,5 +41,14 @@ export class ApiClient {
     if (contentType.includes('application/json')) return res.json();
     return res.text();
   }
+
+  // Async job endpoints
+  async startAsync(body: any) {
+    return this.post('/v1/fuse/async', body);
+  }
+
+  async getJob(jobId: string) {
+    return this.get(`/v1/fuse/async/${encodeURIComponent(jobId)}`);
+  }
 }
 
