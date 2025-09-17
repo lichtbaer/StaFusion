@@ -3,6 +3,7 @@ import { Box, Button, Paper, Typography, Alert } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '../state/AppState';
+import { FileDrop } from '../components/FileDrop';
 
 export const UploadPage: React.FC = () => {
   const { t } = useTranslation();
@@ -28,14 +29,8 @@ export const UploadPage: React.FC = () => {
     <Paper sx={{ p: 3 }}>
       <Typography variant="h5" gutterBottom>{t('upload')}</Typography>
       <Box display="flex" gap={2}>
-        <div>
-          <Typography variant="subtitle2">Dataset A</Typography>
-          <input type="file" accept=".csv,.parquet" onChange={onChange(setA)} />
-        </div>
-        <div>
-          <Typography variant="subtitle2">Dataset B</Typography>
-          <input type="file" accept=".csv,.parquet" onChange={onChange(setB)} />
-        </div>
+        <FileDrop label="Dataset A" maxBytes={(runtime.maxUploadMb ?? 20) * 1024 * 1024} onFile={setA} previewCsv />
+        <FileDrop label="Dataset B" maxBytes={(runtime.maxUploadMb ?? 20) * 1024 * 1024} onFile={setB} previewCsv />
       </Box>
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       <Box mt={2}>
