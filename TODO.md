@@ -56,6 +56,37 @@ Dieses Dokument hält die noch offenen Schritte und Anforderungen für Frontend 
   - Nginx/Reverse Proxy Beispiele; Rate Limiting; Request Size; TLS.
   - Logging mit `job_id`-Korrelation; strukturiert (json) (vorhanden).
 
+## Sicherheit & DSGVO
+- Datenminimierung: Keine personenbezogenen Daten unnötig im FE persistieren; optionaler Persistenz-Flag standardmäßig aus.
+- Transportverschlüsselung: HTTPS erzwingen (HSTS über Nginx), keine gemischten Inhalte.
+- Content Security Policy: strenge CSP ohne `unsafe-inline`; Nonces/Hashes verwenden.
+- Headers: `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options` (oder `frame-ancestors` via CSP).
+- Protokollierung: Keine sensiblen Nutzdaten in Logs; Job-IDs zulassen.
+- Auftragsverarbeitung: Falls externe Dienste (Sentry/CDN) genutzt werden, AVV sicherstellen.
+- Löschkonzept: TTL für persistente Jobs; Export/Deletion-Routen spezifizieren, wenn Datenhaltung aktiviert wird.
+
+## Performance-Ziele
+- FE LCP < 2.5s bei 3G/Low-End Desktop (Lazy-Load, Code-Splitting, leichte Fonts).
+- Tabellen: Virtualisierung, Pagination; initial < 1k Zeilen rendern.
+- Upload: Clientseitige 20 MB Validierung; keine unkomprimierten großen JSON-Körper.
+- Caching: HTTP Caching für statische Assets (immutable), Runtime `config.js` no-store.
+- Monitoring: Web Vitals in Sentry/Analytics optional erfassen.
+
+## CI/CD Pipeline (Vorschlag)
+- Jobs
+  - lint: Ruff (Backend), ESLint (FE)
+  - typecheck: mypy (Backend), tsc (FE)
+  - test: pytest (Backend), Vitest (FE)
+  - e2e: Playwright (FE) gegen lokalem FastAPI (Docker Compose)
+  - build: wheel (Backend optional), FE SPA + WC, Nginx-Image
+  - security: Bandit (Backend), `npm audit` (FE), `pip-audit` optional
+- Artefakte & Releases
+  - FE: Upload der `dist/`, `dist-wc/` und Nginx-Image in Registry
+  - Versionierung: semver; Changelog; Release Notes
+- Gates
+  - PR: alle Checks grün (lint/type/test/build)
+  - Main: Protected Branch; required reviews; dependabot aktivieren
+
 ## Release-Checkliste
 - [ ] Frontend: Wizard finalisieren inkl. Validierung
 - [ ] Frontend: E2E-Tests grün in CI
