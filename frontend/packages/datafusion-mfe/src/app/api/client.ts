@@ -24,6 +24,11 @@ export class ApiClient {
     return this.request(path, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json', ...(init.headers || {}) }, ...init });
   }
 
+  async postForm(path: string, form: FormData, init: RequestInit = {}) {
+    // Let browser set multipart/form-data boundary
+    return this.request(path, { method: 'POST', body: form, ...init });
+  }
+
   async request(path: string, init: RequestInit = {}) {
     const headers = new Headers(init.headers);
     if (this.authEnabled && this.jwtToken) headers.set('Authorization', `Bearer ${this.jwtToken}`);
