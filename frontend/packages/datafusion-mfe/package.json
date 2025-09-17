@@ -1,0 +1,42 @@
+{
+  "name": "datafusion-mfe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 5173",
+    "typecheck": "tsc --noEmit",
+    "build:wc": "vite build -c vite.wc.config.ts",
+    "preview:wc": "vite preview --port 5174 --strictPort -c vite.wc.config.ts",
+    "generate:types": "openapi-typescript ${OPENAPI_URL:-http://localhost:8000/openapi.json} -o src/app/api/types.ts"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.13.3",
+    "@emotion/styled": "^11.13.0",
+    "@hookform/resolvers": "^3.9.0",
+    "@mui/material": "^6.1.6",
+    "@mui/x-data-grid": "^7.22.2",
+    "@tanstack/react-query": "^5.59.15",
+    "i18next": "^23.14.0",
+    "i18next-browser-languagedetector": "^8.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.3.5",
+    "react-hook-form": "^7.53.0",
+    "react-i18next": "^14.1.0",
+    "react-router-dom": "^6.28.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "openapi-typescript": "^7.4.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.8"
+  }
+}
+
