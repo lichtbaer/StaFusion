@@ -15,6 +15,9 @@ from .errors import register_exception_handlers
 from .routers.fusion import router as fusion_router
 
 
+logger = logging.getLogger(__name__)
+
+
 def _setup_logging(settings: APISettings) -> None:
     root = logging.getLogger()
     for h in list(root.handlers):
@@ -38,9 +41,18 @@ def create_app() -> FastAPI:
     app = FastAPI(title="datafusion-ml API", version="0.1.0")
 
     if settings.cors_enabled:
+        # If no origins specified, default to allowing all (for backward compatibility)
+        # but log a warning for production awareness
+        cors_origins = settings.cors_origins if settings.cors_origins else ["*"]
+        if cors_origins == ["*"]:
+            logger.warning(
+                "CORS is configured to allow all origins (*). "
+                "This is not recommended for production. "
+                "Set DFML_CORS_ORIGINS to specific origins."
+            )
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=settings.cors_origins,
+            allow_origins=cors_origins,
             allow_credentials=settings.cors_allow_credentials,
             allow_methods=settings.cors_allow_methods,
             allow_headers=settings.cors_allow_headers,
