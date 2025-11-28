@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import math
-from typing import Dict
+from typing import Dict, Callable, Awaitable
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
-from prometheus_client import CollectorRegistry, CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.requests import Request
 from starlette.responses import Response
 
 from .config import APISettings
@@ -50,8 +50,6 @@ def create_app() -> FastAPI:
 
     # Metrics endpoint (Prometheus)
     if settings.enable_metrics:
-        registry = CollectorRegistry()  # default aggregates global REGISTRY, override if needed
-
         @app.get("/metrics")
         def metrics() -> Response:  # type: ignore[no-untyped-def]
             output = generate_latest()  # from default REGISTRY
@@ -75,15 +73,23 @@ def create_app() -> FastAPI:
                 if getattr(r, "path", "").endswith("/fuse"):
                     app.add_api_route("/fuse", r.endpoint, methods=list(r.methods))  # type: ignore[arg-type]
 
-    # Body size limit via middleware (approximate)
+    # Body size limit via middleware
     max_bytes = settings.max_body_mb * 1024 * 1024
 
     @app.middleware("http")
-    async def limit_body_size(request, call_next):  # type: ignore[no-untyped-def]
-        # Note: Starlette receives body streamed; we read and check length
+    async def limit_body_size(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        # Read body to check size, then recreate request with body for downstream handlers
         body = await request.body()
         if len(body) > max_bytes:
             return Response(status_code=413, content="Request entity too large")
+        
+        # Recreate request with body so downstream handlers can read it
+        async def receive() -> dict:
+            return {"type": "http.request", "body": body}
+        
+        request._receive = receive  # type: ignore[attr-defined]
         return await call_next(request)
 
     return app
