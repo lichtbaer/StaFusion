@@ -49,14 +49,25 @@ def _exclusive_columns(df_left: pd.DataFrame, df_right: pd.DataFrame) -> List[st
     return sorted(list(set(df_left.columns) - set(df_right.columns)))
 
 
+def _is_categorical_column(series: pd.Series) -> bool:
+    """Check if a pandas Series is categorical or object type."""
+    return (
+        pd.api.types.is_object_dtype(series)
+        or pd.api.types.is_categorical_dtype(series)
+    )
+
+
 def _coerce_categorical_alignment(
     a: pd.DataFrame, b: pd.DataFrame, columns: Sequence[str]
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     a_aligned = a.copy()
     b_aligned = b.copy()
     for c in columns:
-        if pd.api.types.is_object_dtype(a_aligned[c]) or pd.api.types.is_categorical_dtype(a_aligned[c]) or pd.api.types.is_object_dtype(b_aligned[c]) or pd.api.types.is_categorical_dtype(b_aligned[c]):
-            cats = pd.Index(sorted(pd.unique(pd.concat([a_aligned[c], b_aligned[c]], ignore_index=True).dropna())))
+        col_a = a_aligned[c]
+        col_b = b_aligned[c]
+        if _is_categorical_column(col_a) or _is_categorical_column(col_b):
+            combined = pd.concat([col_a, col_b], ignore_index=True)
+            cats = pd.Index(sorted(pd.unique(combined.dropna())))
             a_aligned[c] = a_aligned[c].astype(pd.CategoricalDtype(categories=cats))
             b_aligned[c] = b_aligned[c].astype(pd.CategoricalDtype(categories=cats))
     return a_aligned, b_aligned

@@ -54,6 +54,9 @@ api = [
   "pyarrow>=15",
   "python-multipart>=0.0.9"
 ]
+auth = [
+  "PyJWT>=2.8.0"
+]
 docs = [
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",

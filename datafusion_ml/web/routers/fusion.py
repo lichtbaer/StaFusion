@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import io
+import json
+import logging
+import os
+import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -15,25 +20,136 @@ from ..schemas import FuseRequest, FuseResponse
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Job store with TTL (Time To Live) in seconds
 # Jobs older than JOB_TTL_SECONDS will be automatically cleaned up
 JOB_TTL_SECONDS = 3600  # 1 hour default
 _JOB_STORE: Dict[str, Dict[str, Any]] = {}
 _JOB_TIMESTAMPS: Dict[str, float] = {}
+# Lock for thread-safe access to job store
+_JOB_STORE_LOCK = threading.Lock()
+# Persistence settings (loaded from config)
+_PERSISTENCE_ENABLED = False
+_PERSISTENCE_PATH: Path | None = None
+
+
+def _init_persistence(settings: APISettings) -> None:
+    """Initialize job persistence if enabled."""
+    global _PERSISTENCE_ENABLED, _PERSISTENCE_PATH
+    _PERSISTENCE_ENABLED = settings.job_persistence_enabled
+    if _PERSISTENCE_ENABLED:
+        _PERSISTENCE_PATH = Path(settings.job_persistence_path)
+        _PERSISTENCE_PATH.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Job persistence enabled: {_PERSISTENCE_PATH}")
+        # Load existing jobs on startup
+        _load_persisted_jobs()
+
+
+def _get_job_file_path(job_id: str) -> Path:
+    """Get file path for a job."""
+    if _PERSISTENCE_PATH is None:
+        raise RuntimeError("Persistence not initialized")
+    return _PERSISTENCE_PATH / f"{job_id}.json"
+
+
+def _save_job(job_id: str, job_data: Dict[str, Any], timestamp: float) -> None:
+    """Save job to disk if persistence is enabled."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return
+    try:
+        job_file = _get_job_file_path(job_id)
+        data = {
+            "job_id": job_id,
+            "data": job_data,
+            "timestamp": timestamp,
+        }
+        with open(job_file, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.warning(f"Failed to persist job {job_id}: {str(e)}")
+
+
+def _load_job(job_id: str) -> tuple[Dict[str, Any], float] | None:
+    """Load job from disk if persistence is enabled."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return None
+    try:
+        job_file = _get_job_file_path(job_id)
+        if not job_file.exists():
+            return None
+        with open(job_file, "r") as f:
+            data = json.load(f)
+        return data["data"], data["timestamp"]
+    except Exception as e:
+        logger.warning(f"Failed to load job {job_id}: {str(e)}")
+        return None
+
+
+def _delete_job_file(job_id: str) -> None:
+    """Delete job file from disk."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return
+    try:
+        job_file = _get_job_file_path(job_id)
+        if job_file.exists():
+            job_file.unlink()
+    except Exception as e:
+        logger.warning(f"Failed to delete job file {job_id}: {str(e)}")
+
+
+def _load_persisted_jobs() -> None:
+    """Load all persisted jobs on startup."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return
+    try:
+        current_time = time.time()
+        loaded_count = 0
+        for job_file in _PERSISTENCE_PATH.glob("*.json"):
+            try:
+                with open(job_file, "r") as f:
+                    data = json.load(f)
+                job_id = data["job_id"]
+                job_data = data["data"]
+                timestamp = data["timestamp"]
+                
+                # Only load jobs that haven't expired
+                if current_time - timestamp < JOB_TTL_SECONDS:
+                    _JOB_STORE[job_id] = job_data
+                    _JOB_TIMESTAMPS[job_id] = timestamp
+                    loaded_count += 1
+                else:
+                    # Delete expired jobs
+                    job_file.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to load job from {job_file}: {str(e)}")
+        
+        if loaded_count > 0:
+            logger.info(f"Loaded {loaded_count} persisted job(s) from disk")
+    except Exception as e:
+        logger.error(f"Failed to load persisted jobs: {str(e)}")
 
 
 def _cleanup_old_jobs() -> None:
-    """Remove jobs older than JOB_TTL_SECONDS from the store."""
-    current_time = time.time()
-    expired_jobs = [
-        job_id
-        for job_id, timestamp in _JOB_TIMESTAMPS.items()
-        if current_time - timestamp > JOB_TTL_SECONDS
-    ]
-    for job_id in expired_jobs:
-        _JOB_STORE.pop(job_id, None)
-        _JOB_TIMESTAMPS.pop(job_id, None)
+    """Remove jobs older than JOB_TTL_SECONDS from the store.
+    
+    This function is thread-safe and should be called regularly to prevent
+    memory leaks from accumulating old job data.
+    """
+    with _JOB_STORE_LOCK:
+        current_time = time.time()
+        expired_jobs = [
+            job_id
+            for job_id, timestamp in _JOB_TIMESTAMPS.items()
+            if current_time - timestamp > JOB_TTL_SECONDS
+        ]
+        if expired_jobs:
+            logger.info(f"Cleaning up {len(expired_jobs)} expired job(s)")
+            for job_id in expired_jobs:
+                _JOB_STORE.pop(job_id, None)
+                _JOB_TIMESTAMPS.pop(job_id, None)
+                # Delete persisted file if persistence is enabled
+                _delete_job_file(job_id)
 
 
 @router.post("/fuse", response_model=FuseResponse)
@@ -46,35 +162,73 @@ def fuse(req: FuseRequest) -> FuseResponse:
 
 
 def _run_fusion_job(job_id: str, req: FuseRequest) -> None:
+    """Run fusion job in background and update job store."""
     try:
         result = perform_fusion(req)
-        _JOB_STORE[job_id] = {"status": "done", "result": result.model_dump()}  # type: ignore[attr-defined]
-        # Update timestamp when job completes
-        _JOB_TIMESTAMPS[job_id] = time.time()
+        timestamp = time.time()
+        job_data = {"status": "done", "result": result.model_dump()}  # type: ignore[attr-defined]
+        with _JOB_STORE_LOCK:
+            _JOB_STORE[job_id] = job_data
+            _JOB_TIMESTAMPS[job_id] = timestamp
+        _save_job(job_id, job_data, timestamp)
+        logger.info(f"Job {job_id} completed successfully")
     except Exception as e:  # noqa: BLE001
-        _JOB_STORE[job_id] = {"status": "error", "error": str(e)}
-        # Update timestamp even on error
-        _JOB_TIMESTAMPS[job_id] = time.time()
+        timestamp = time.time()
+        job_data = {"status": "error", "error": str(e)}
+        with _JOB_STORE_LOCK:
+            _JOB_STORE[job_id] = job_data
+            _JOB_TIMESTAMPS[job_id] = timestamp
+        _save_job(job_id, job_data, timestamp)
+        logger.error(f"Job {job_id} failed: {str(e)}", exc_info=True)
 
 
 @router.post("/fuse/async")
 def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
+    """Create a new async fusion job."""
+    settings = APISettings.from_env()
+    # Initialize persistence on first use
+    if _PERSISTENCE_PATH is None:
+        _init_persistence(settings)
+    
     # Cleanup old jobs before creating new one
     _cleanup_old_jobs()
     
     job_id = str(uuid.uuid4())
-    _JOB_STORE[job_id] = {"status": "pending"}
-    _JOB_TIMESTAMPS[job_id] = time.time()
+    timestamp = time.time()
+    job_data = {"status": "pending"}
+    with _JOB_STORE_LOCK:
+        _JOB_STORE[job_id] = job_data
+        _JOB_TIMESTAMPS[job_id] = timestamp
+    _save_job(job_id, job_data, timestamp)
     tasks.add_task(_run_fusion_job, job_id, req)
+    logger.info(f"Created async job {job_id}")
     return {"job_id": job_id}
 
 
 @router.get("/fuse/async/{job_id}")
 def fuse_async_status(job_id: str) -> Dict[str, Any]:
+    """Get status of an async fusion job."""
+    settings = APISettings.from_env()
+    # Initialize persistence on first use
+    if _PERSISTENCE_PATH is None:
+        _init_persistence(settings)
+    
     # Cleanup old jobs on access
     _cleanup_old_jobs()
     
-    data = _JOB_STORE.get(job_id)
+    with _JOB_STORE_LOCK:
+        data = _JOB_STORE.get(job_id)
+    
+    # Try to load from disk if not in memory (e.g., after restart)
+    if not data and _PERSISTENCE_ENABLED:
+        loaded = _load_job(job_id)
+        if loaded:
+            job_data, timestamp = loaded
+            with _JOB_STORE_LOCK:
+                _JOB_STORE[job_id] = job_data
+                _JOB_TIMESTAMPS[job_id] = timestamp
+            data = job_data
+    
     if not data:
         raise HTTPException(status_code=404, detail="Job not found")
     return data
@@ -94,38 +248,123 @@ def _detect_file_type(file_bytes: bytes, filename: Optional[str] = None) -> str:
     """
     Detect file type using magic numbers and filename.
     Returns 'parquet' or 'csv'.
+    
+    Magic numbers are checked first for security, filename is only used as fallback.
     """
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=422, detail="File is empty")
+    
     # Parquet magic number: first 4 bytes are "PAR1" (0x50415231)
     if len(file_bytes) >= 4 and file_bytes[:4] == b"PAR1":
         return "parquet"
     
-    # Check filename as fallback
-    if filename and filename.lower().endswith(".parquet"):
-        return "parquet"
+    # Check for other binary formats that should be rejected
+    # Excel files (XLSX starts with PK\x03\x04 - ZIP signature)
+    if len(file_bytes) >= 4 and file_bytes[:2] == b"PK":
+        raise HTTPException(
+            status_code=422,
+            detail="Excel files (.xlsx, .xls) are not supported. Please convert to CSV or Parquet."
+        )
     
-    # Default to CSV (could be enhanced with more validation)
+    # Check filename as fallback (less secure, but helpful for user experience)
+    if filename:
+        filename_lower = filename.lower()
+        if filename_lower.endswith(".parquet"):
+            # If filename suggests parquet but magic number doesn't match, warn
+            logger.warning(f"Filename suggests Parquet but magic number doesn't match: {filename}")
+            return "parquet"
+        if filename_lower.endswith((".xlsx", ".xls")):
+            raise HTTPException(
+                status_code=422,
+                detail="Excel files are not supported. Please convert to CSV or Parquet."
+            )
+    
+    # Default to CSV - basic validation will happen during read
     return "csv"
 
 
 def _read_csv(file_bytes: bytes) -> pd.DataFrame:
-    """Read CSV file with error handling."""
+    """Read CSV file with error handling and validation.
+    
+    Validates that the file is actually a CSV by attempting to parse it.
+    """
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=422, detail="CSV file is empty")
+    
+    # Basic CSV validation: should contain at least one newline or comma
+    # This helps catch cases where binary files are misidentified as CSV
     try:
-        return pd.read_csv(io.BytesIO(file_bytes))
+        # Try to decode as UTF-8 first (most common encoding)
+        text_preview = file_bytes[:1024].decode('utf-8', errors='ignore')
+        if not any(c in text_preview for c in [',', ';', '\t', '\n', '\r']):
+            raise HTTPException(
+                status_code=422,
+                detail="File does not appear to be a valid CSV (no delimiters found). "
+                       "Please ensure the file is a CSV or Parquet file."
+            )
+    except UnicodeDecodeError:
+        # If we can't decode as UTF-8, it's likely not a text file
+        raise HTTPException(
+            status_code=422,
+            detail="File does not appear to be a valid CSV (not UTF-8 text). "
+                   "Please ensure the file is a CSV or Parquet file."
+        )
+    
+    try:
+        df = pd.read_csv(io.BytesIO(file_bytes))
+        if df.empty:
+            raise HTTPException(status_code=422, detail="CSV file contains no data rows")
+        return df
     except pd.errors.EmptyDataError:
         raise HTTPException(status_code=422, detail="CSV file is empty")
     except pd.errors.ParserError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid CSV format: {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid CSV format: {str(e)}. Please check the file format and encoding."
+        )
+    except MemoryError:
+        raise HTTPException(
+            status_code=413,
+            detail="CSV file is too large to process. Please reduce file size or use Parquet format."
+        )
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Error reading CSV file: {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Error reading CSV file: {str(e)}. Please verify the file is a valid CSV."
+        )
 
 
 def _read_parquet(file_bytes: bytes) -> pd.DataFrame:
-    """Read Parquet file with error handling."""
+    """Read Parquet file with error handling and validation.
+    
+    Validates that the file is actually a Parquet file by attempting to parse it.
+    """
+    if len(file_bytes) < 4:
+        raise HTTPException(status_code=422, detail="Parquet file is too small or corrupted")
+    
+    # Verify magic number again (defense in depth)
+    if file_bytes[:4] != b"PAR1":
+        raise HTTPException(
+            status_code=422,
+            detail="File does not have Parquet magic number. Please ensure the file is a valid Parquet file."
+        )
+    
     try:
         table = pq.read_table(io.BytesIO(file_bytes))
-        return table.to_pandas()
+        df = table.to_pandas()
+        if df.empty:
+            raise HTTPException(status_code=422, detail="Parquet file contains no data rows")
+        return df
+    except MemoryError:
+        raise HTTPException(
+            status_code=413,
+            detail="Parquet file is too large to process. Please reduce file size."
+        )
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Error reading Parquet file: {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Error reading Parquet file: {str(e)}. Please verify the file is a valid Parquet file."
+        )
 
 
 @router.post("/fuse/upload", response_model=FuseResponse)

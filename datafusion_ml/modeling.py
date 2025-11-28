@@ -170,54 +170,38 @@ class PyCaretTrainer:
             problem_type = detect_problem_type(y)
 
         features = tuple(X.columns.tolist())
+        
+        # Common setup for both classification and regression
         if problem_type == "classification":
             from pycaret.classification import ClassificationExperiment
-
             exp = ClassificationExperiment()
-            data = X.copy()
-            data[y.name] = y
-            exp.setup(
-                data=data,
-                target=y.name,
-                session_id=config.random_state,
-                fold=config.cv_splits,
-                verbose=False,
-                html=False,
-            )
-            best = exp.compare_models(sort="AUC")
-            final_model = exp.finalize_model(best)
-            return TrainedModel(
-                problem_type=problem_type,
-                model=final_model,
-                backend="pycaret",
-                target=y.name,
-                features=features,
-                extra={"experiment": exp},
-            )
+            sort_metric = "AUC"
         else:
             from pycaret.regression import RegressionExperiment
-
             exp = RegressionExperiment()
-            data = X.copy()
-            data[y.name] = y
-            exp.setup(
-                data=data,
-                target=y.name,
-                session_id=config.random_state,
-                fold=config.cv_splits,
-                verbose=False,
-                html=False,
-            )
-            best = exp.compare_models(sort="R2")
-            final_model = exp.finalize_model(best)
-            return TrainedModel(
-                problem_type=problem_type,
-                model=final_model,
-                backend="pycaret",
-                target=y.name,
-                features=features,
-                extra={"experiment": exp},
-            )
+            sort_metric = "R2"
+        
+        data = X.copy()
+        data[y.name] = y
+        exp.setup(
+            data=data,
+            target=y.name,
+            session_id=config.random_state,
+            fold=config.cv_splits,
+            verbose=False,
+            html=False,
+        )
+        best = exp.compare_models(sort=sort_metric)
+        final_model = exp.finalize_model(best)
+        
+        return TrainedModel(
+            problem_type=problem_type,
+            model=final_model,
+            backend="pycaret",
+            target=y.name,
+            features=features,
+            extra={"experiment": exp},
+        )
 
     def infer_problem_type(self, y: pd.Series) -> ProblemType:
         return detect_problem_type(y)
@@ -242,18 +226,22 @@ def train_model(
 
 
 def predict(model: TrainedModel, X: pd.DataFrame) -> npt.NDArray[Any]:
+    """Predict using a trained model.
+    
+    Raises:
+        ValueError: If PyCaret model is missing required experiment data.
+    """
     # Ensure proper list-based column selection (tuple would be a single key)
     X = X[list(model.features)]
     if model.backend == "pycaret":
-        if model.problem_type == "classification":
-            exp = model.extra["experiment"]  # type: ignore[index]
-            preds = exp.predict_model(model.model, data=X)
-            # Prediction column name in PyCaret output is 'prediction_label'
-            return preds["prediction_label"].to_numpy()
-        else:
-            exp = model.extra["experiment"]  # type: ignore[index]
-            preds = exp.predict_model(model.model, data=X)
-            return preds["prediction_label"].to_numpy()
+        if model.extra is None:
+            raise ValueError("PyCaret model missing 'extra' dictionary")
+        if "experiment" not in model.extra:
+            raise ValueError("PyCaret model missing 'experiment' in extra dictionary")
+        exp = model.extra["experiment"]
+        preds = exp.predict_model(model.model, data=X)
+        # Prediction column name in PyCaret output is 'prediction_label'
+        return preds["prediction_label"].to_numpy()
     # sklearn
     predictor = cast(PredictorProtocol, model.model)
     return predictor.predict(X)
