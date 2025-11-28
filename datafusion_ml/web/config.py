@@ -40,6 +40,41 @@ class APISettings(BaseSettings):
     log_level: str = Field(default="INFO")
     log_format: str = Field(default="json")  # json|plain
 
+    # Rate limiting
+    rate_limit_enabled: bool = Field(
+        default=False,
+        description="Enable rate limiting middleware."
+    )
+    rate_limit_per_minute: int = Field(
+        default=60,
+        ge=1,
+        description="Maximum number of requests per minute per client."
+    )
+
+    # JWT Authentication
+    jwt_enabled: bool = Field(
+        default=False,
+        description="Enable JWT authentication middleware."
+    )
+    jwt_secret: str | None = Field(
+        default=None,
+        description="JWT secret key for token validation. Required if JWT is enabled."
+    )
+    jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT algorithm for token validation."
+    )
+
+    # Job persistence
+    job_persistence_enabled: bool = Field(
+        default=False,
+        description="Enable job persistence to disk. Jobs will survive server restarts."
+    )
+    job_persistence_path: str = Field(
+        default="/tmp/datafusion-ml-jobs",
+        description="Directory path for storing job data. Created if it doesn't exist."
+    )
+
     @classmethod
     def from_env(cls) -> "APISettings":
         """Create settings from environment variables.
@@ -59,6 +94,12 @@ class APISettings(BaseSettings):
             raise ValueError(
                 "CORS allow_credentials cannot be True when origins contains '*'. "
                 "Specify explicit origins for credential support."
+            )
+        # Validate JWT configuration
+        if settings.jwt_enabled and not settings.jwt_secret:
+            raise ValueError(
+                "JWT authentication is enabled but jwt_secret is not set. "
+                "Set DFML_JWT_SECRET environment variable."
             )
         return settings
 

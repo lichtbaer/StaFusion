@@ -12,6 +12,7 @@ from starlette.responses import Response
 
 from .config import APISettings
 from .errors import register_exception_handlers
+from .middleware import RateLimiter, jwt_auth_middleware, rate_limit_middleware
 from .routers.fusion import router as fusion_router
 
 
@@ -59,6 +60,35 @@ def create_app() -> FastAPI:
         )
 
     register_exception_handlers(app)
+
+    # Rate limiting middleware (if enabled)
+    if settings.rate_limit_enabled:
+        rate_limiter = RateLimiter(requests_per_minute=settings.rate_limit_per_minute)
+        
+        @app.middleware("http")
+        async def rate_limit(
+            request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        ) -> Response:
+            return await rate_limit_middleware(request, call_next, rate_limiter)
+        
+        logger.info(
+            f"Rate limiting enabled: {settings.rate_limit_per_minute} requests per minute"
+        )
+
+    # JWT authentication middleware (if enabled)
+    if settings.jwt_enabled:
+        @app.middleware("http")
+        async def jwt_auth(
+            request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        ) -> Response:
+            return await jwt_auth_middleware(
+                request,
+                call_next,
+                settings.jwt_secret,
+                settings.jwt_algorithm,
+            )
+        
+        logger.info("JWT authentication enabled")
 
     # Metrics endpoint (Prometheus)
     if settings.enable_metrics:

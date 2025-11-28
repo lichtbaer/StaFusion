@@ -170,54 +170,38 @@ class PyCaretTrainer:
             problem_type = detect_problem_type(y)
 
         features = tuple(X.columns.tolist())
+        
+        # Common setup for both classification and regression
         if problem_type == "classification":
             from pycaret.classification import ClassificationExperiment
-
             exp = ClassificationExperiment()
-            data = X.copy()
-            data[y.name] = y
-            exp.setup(
-                data=data,
-                target=y.name,
-                session_id=config.random_state,
-                fold=config.cv_splits,
-                verbose=False,
-                html=False,
-            )
-            best = exp.compare_models(sort="AUC")
-            final_model = exp.finalize_model(best)
-            return TrainedModel(
-                problem_type=problem_type,
-                model=final_model,
-                backend="pycaret",
-                target=y.name,
-                features=features,
-                extra={"experiment": exp},
-            )
+            sort_metric = "AUC"
         else:
             from pycaret.regression import RegressionExperiment
-
             exp = RegressionExperiment()
-            data = X.copy()
-            data[y.name] = y
-            exp.setup(
-                data=data,
-                target=y.name,
-                session_id=config.random_state,
-                fold=config.cv_splits,
-                verbose=False,
-                html=False,
-            )
-            best = exp.compare_models(sort="R2")
-            final_model = exp.finalize_model(best)
-            return TrainedModel(
-                problem_type=problem_type,
-                model=final_model,
-                backend="pycaret",
-                target=y.name,
-                features=features,
-                extra={"experiment": exp},
-            )
+            sort_metric = "R2"
+        
+        data = X.copy()
+        data[y.name] = y
+        exp.setup(
+            data=data,
+            target=y.name,
+            session_id=config.random_state,
+            fold=config.cv_splits,
+            verbose=False,
+            html=False,
+        )
+        best = exp.compare_models(sort=sort_metric)
+        final_model = exp.finalize_model(best)
+        
+        return TrainedModel(
+            problem_type=problem_type,
+            model=final_model,
+            backend="pycaret",
+            target=y.name,
+            features=features,
+            extra={"experiment": exp},
+        )
 
     def infer_problem_type(self, y: pd.Series) -> ProblemType:
         return detect_problem_type(y)

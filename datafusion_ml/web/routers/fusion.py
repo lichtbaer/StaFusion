@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
+import os
 import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -26,6 +29,105 @@ _JOB_STORE: Dict[str, Dict[str, Any]] = {}
 _JOB_TIMESTAMPS: Dict[str, float] = {}
 # Lock for thread-safe access to job store
 _JOB_STORE_LOCK = threading.Lock()
+# Persistence settings (loaded from config)
+_PERSISTENCE_ENABLED = False
+_PERSISTENCE_PATH: Path | None = None
+
+
+def _init_persistence(settings: APISettings) -> None:
+    """Initialize job persistence if enabled."""
+    global _PERSISTENCE_ENABLED, _PERSISTENCE_PATH
+    _PERSISTENCE_ENABLED = settings.job_persistence_enabled
+    if _PERSISTENCE_ENABLED:
+        _PERSISTENCE_PATH = Path(settings.job_persistence_path)
+        _PERSISTENCE_PATH.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Job persistence enabled: {_PERSISTENCE_PATH}")
+        # Load existing jobs on startup
+        _load_persisted_jobs()
+
+
+def _get_job_file_path(job_id: str) -> Path:
+    """Get file path for a job."""
+    if _PERSISTENCE_PATH is None:
+        raise RuntimeError("Persistence not initialized")
+    return _PERSISTENCE_PATH / f"{job_id}.json"
+
+
+def _save_job(job_id: str, job_data: Dict[str, Any], timestamp: float) -> None:
+    """Save job to disk if persistence is enabled."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return
+    try:
+        job_file = _get_job_file_path(job_id)
+        data = {
+            "job_id": job_id,
+            "data": job_data,
+            "timestamp": timestamp,
+        }
+        with open(job_file, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.warning(f"Failed to persist job {job_id}: {str(e)}")
+
+
+def _load_job(job_id: str) -> tuple[Dict[str, Any], float] | None:
+    """Load job from disk if persistence is enabled."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return None
+    try:
+        job_file = _get_job_file_path(job_id)
+        if not job_file.exists():
+            return None
+        with open(job_file, "r") as f:
+            data = json.load(f)
+        return data["data"], data["timestamp"]
+    except Exception as e:
+        logger.warning(f"Failed to load job {job_id}: {str(e)}")
+        return None
+
+
+def _delete_job_file(job_id: str) -> None:
+    """Delete job file from disk."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return
+    try:
+        job_file = _get_job_file_path(job_id)
+        if job_file.exists():
+            job_file.unlink()
+    except Exception as e:
+        logger.warning(f"Failed to delete job file {job_id}: {str(e)}")
+
+
+def _load_persisted_jobs() -> None:
+    """Load all persisted jobs on startup."""
+    if not _PERSISTENCE_ENABLED or _PERSISTENCE_PATH is None:
+        return
+    try:
+        current_time = time.time()
+        loaded_count = 0
+        for job_file in _PERSISTENCE_PATH.glob("*.json"):
+            try:
+                with open(job_file, "r") as f:
+                    data = json.load(f)
+                job_id = data["job_id"]
+                job_data = data["data"]
+                timestamp = data["timestamp"]
+                
+                # Only load jobs that haven't expired
+                if current_time - timestamp < JOB_TTL_SECONDS:
+                    _JOB_STORE[job_id] = job_data
+                    _JOB_TIMESTAMPS[job_id] = timestamp
+                    loaded_count += 1
+                else:
+                    # Delete expired jobs
+                    job_file.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to load job from {job_file}: {str(e)}")
+        
+        if loaded_count > 0:
+            logger.info(f"Loaded {loaded_count} persisted job(s) from disk")
+    except Exception as e:
+        logger.error(f"Failed to load persisted jobs: {str(e)}")
 
 
 def _cleanup_old_jobs() -> None:
@@ -46,6 +148,8 @@ def _cleanup_old_jobs() -> None:
             for job_id in expired_jobs:
                 _JOB_STORE.pop(job_id, None)
                 _JOB_TIMESTAMPS.pop(job_id, None)
+                # Delete persisted file if persistence is enabled
+                _delete_job_file(job_id)
 
 
 @router.post("/fuse", response_model=FuseResponse)
@@ -61,27 +165,41 @@ def _run_fusion_job(job_id: str, req: FuseRequest) -> None:
     """Run fusion job in background and update job store."""
     try:
         result = perform_fusion(req)
+        timestamp = time.time()
+        job_data = {"status": "done", "result": result.model_dump()}  # type: ignore[attr-defined]
         with _JOB_STORE_LOCK:
-            _JOB_STORE[job_id] = {"status": "done", "result": result.model_dump()}  # type: ignore[attr-defined]
-            _JOB_TIMESTAMPS[job_id] = time.time()
+            _JOB_STORE[job_id] = job_data
+            _JOB_TIMESTAMPS[job_id] = timestamp
+        _save_job(job_id, job_data, timestamp)
         logger.info(f"Job {job_id} completed successfully")
     except Exception as e:  # noqa: BLE001
+        timestamp = time.time()
+        job_data = {"status": "error", "error": str(e)}
         with _JOB_STORE_LOCK:
-            _JOB_STORE[job_id] = {"status": "error", "error": str(e)}
-            _JOB_TIMESTAMPS[job_id] = time.time()
+            _JOB_STORE[job_id] = job_data
+            _JOB_TIMESTAMPS[job_id] = timestamp
+        _save_job(job_id, job_data, timestamp)
         logger.error(f"Job {job_id} failed: {str(e)}", exc_info=True)
 
 
 @router.post("/fuse/async")
 def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
     """Create a new async fusion job."""
+    settings = APISettings.from_env()
+    # Initialize persistence on first use
+    if _PERSISTENCE_PATH is None:
+        _init_persistence(settings)
+    
     # Cleanup old jobs before creating new one
     _cleanup_old_jobs()
     
     job_id = str(uuid.uuid4())
+    timestamp = time.time()
+    job_data = {"status": "pending"}
     with _JOB_STORE_LOCK:
-        _JOB_STORE[job_id] = {"status": "pending"}
-        _JOB_TIMESTAMPS[job_id] = time.time()
+        _JOB_STORE[job_id] = job_data
+        _JOB_TIMESTAMPS[job_id] = timestamp
+    _save_job(job_id, job_data, timestamp)
     tasks.add_task(_run_fusion_job, job_id, req)
     logger.info(f"Created async job {job_id}")
     return {"job_id": job_id}
@@ -90,11 +208,27 @@ def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
 @router.get("/fuse/async/{job_id}")
 def fuse_async_status(job_id: str) -> Dict[str, Any]:
     """Get status of an async fusion job."""
+    settings = APISettings.from_env()
+    # Initialize persistence on first use
+    if _PERSISTENCE_PATH is None:
+        _init_persistence(settings)
+    
     # Cleanup old jobs on access
     _cleanup_old_jobs()
     
     with _JOB_STORE_LOCK:
         data = _JOB_STORE.get(job_id)
+    
+    # Try to load from disk if not in memory (e.g., after restart)
+    if not data and _PERSISTENCE_ENABLED:
+        loaded = _load_job(job_id)
+        if loaded:
+            job_data, timestamp = loaded
+            with _JOB_STORE_LOCK:
+                _JOB_STORE[job_id] = job_data
+                _JOB_TIMESTAMPS[job_id] = timestamp
+            data = job_data
+    
     if not data:
         raise HTTPException(status_code=404, detail="Job not found")
     return data
