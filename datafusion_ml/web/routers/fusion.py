@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import logging
+import threading
 import time
 import uuid
 from typing import Any, Dict, List, Optional
@@ -15,25 +17,35 @@ from ..schemas import FuseRequest, FuseResponse
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Job store with TTL (Time To Live) in seconds
 # Jobs older than JOB_TTL_SECONDS will be automatically cleaned up
 JOB_TTL_SECONDS = 3600  # 1 hour default
 _JOB_STORE: Dict[str, Dict[str, Any]] = {}
 _JOB_TIMESTAMPS: Dict[str, float] = {}
+# Lock for thread-safe access to job store
+_JOB_STORE_LOCK = threading.Lock()
 
 
 def _cleanup_old_jobs() -> None:
-    """Remove jobs older than JOB_TTL_SECONDS from the store."""
-    current_time = time.time()
-    expired_jobs = [
-        job_id
-        for job_id, timestamp in _JOB_TIMESTAMPS.items()
-        if current_time - timestamp > JOB_TTL_SECONDS
-    ]
-    for job_id in expired_jobs:
-        _JOB_STORE.pop(job_id, None)
-        _JOB_TIMESTAMPS.pop(job_id, None)
+    """Remove jobs older than JOB_TTL_SECONDS from the store.
+    
+    This function is thread-safe and should be called regularly to prevent
+    memory leaks from accumulating old job data.
+    """
+    with _JOB_STORE_LOCK:
+        current_time = time.time()
+        expired_jobs = [
+            job_id
+            for job_id, timestamp in _JOB_TIMESTAMPS.items()
+            if current_time - timestamp > JOB_TTL_SECONDS
+        ]
+        if expired_jobs:
+            logger.info(f"Cleaning up {len(expired_jobs)} expired job(s)")
+            for job_id in expired_jobs:
+                _JOB_STORE.pop(job_id, None)
+                _JOB_TIMESTAMPS.pop(job_id, None)
 
 
 @router.post("/fuse", response_model=FuseResponse)
@@ -46,35 +58,43 @@ def fuse(req: FuseRequest) -> FuseResponse:
 
 
 def _run_fusion_job(job_id: str, req: FuseRequest) -> None:
+    """Run fusion job in background and update job store."""
     try:
         result = perform_fusion(req)
-        _JOB_STORE[job_id] = {"status": "done", "result": result.model_dump()}  # type: ignore[attr-defined]
-        # Update timestamp when job completes
-        _JOB_TIMESTAMPS[job_id] = time.time()
+        with _JOB_STORE_LOCK:
+            _JOB_STORE[job_id] = {"status": "done", "result": result.model_dump()}  # type: ignore[attr-defined]
+            _JOB_TIMESTAMPS[job_id] = time.time()
+        logger.info(f"Job {job_id} completed successfully")
     except Exception as e:  # noqa: BLE001
-        _JOB_STORE[job_id] = {"status": "error", "error": str(e)}
-        # Update timestamp even on error
-        _JOB_TIMESTAMPS[job_id] = time.time()
+        with _JOB_STORE_LOCK:
+            _JOB_STORE[job_id] = {"status": "error", "error": str(e)}
+            _JOB_TIMESTAMPS[job_id] = time.time()
+        logger.error(f"Job {job_id} failed: {str(e)}", exc_info=True)
 
 
 @router.post("/fuse/async")
 def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
+    """Create a new async fusion job."""
     # Cleanup old jobs before creating new one
     _cleanup_old_jobs()
     
     job_id = str(uuid.uuid4())
-    _JOB_STORE[job_id] = {"status": "pending"}
-    _JOB_TIMESTAMPS[job_id] = time.time()
+    with _JOB_STORE_LOCK:
+        _JOB_STORE[job_id] = {"status": "pending"}
+        _JOB_TIMESTAMPS[job_id] = time.time()
     tasks.add_task(_run_fusion_job, job_id, req)
+    logger.info(f"Created async job {job_id}")
     return {"job_id": job_id}
 
 
 @router.get("/fuse/async/{job_id}")
 def fuse_async_status(job_id: str) -> Dict[str, Any]:
+    """Get status of an async fusion job."""
     # Cleanup old jobs on access
     _cleanup_old_jobs()
     
-    data = _JOB_STORE.get(job_id)
+    with _JOB_STORE_LOCK:
+        data = _JOB_STORE.get(job_id)
     if not data:
         raise HTTPException(status_code=404, detail="Job not found")
     return data
@@ -94,38 +114,123 @@ def _detect_file_type(file_bytes: bytes, filename: Optional[str] = None) -> str:
     """
     Detect file type using magic numbers and filename.
     Returns 'parquet' or 'csv'.
+    
+    Magic numbers are checked first for security, filename is only used as fallback.
     """
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=422, detail="File is empty")
+    
     # Parquet magic number: first 4 bytes are "PAR1" (0x50415231)
     if len(file_bytes) >= 4 and file_bytes[:4] == b"PAR1":
         return "parquet"
     
-    # Check filename as fallback
-    if filename and filename.lower().endswith(".parquet"):
-        return "parquet"
+    # Check for other binary formats that should be rejected
+    # Excel files (XLSX starts with PK\x03\x04 - ZIP signature)
+    if len(file_bytes) >= 4 and file_bytes[:2] == b"PK":
+        raise HTTPException(
+            status_code=422,
+            detail="Excel files (.xlsx, .xls) are not supported. Please convert to CSV or Parquet."
+        )
     
-    # Default to CSV (could be enhanced with more validation)
+    # Check filename as fallback (less secure, but helpful for user experience)
+    if filename:
+        filename_lower = filename.lower()
+        if filename_lower.endswith(".parquet"):
+            # If filename suggests parquet but magic number doesn't match, warn
+            logger.warning(f"Filename suggests Parquet but magic number doesn't match: {filename}")
+            return "parquet"
+        if filename_lower.endswith((".xlsx", ".xls")):
+            raise HTTPException(
+                status_code=422,
+                detail="Excel files are not supported. Please convert to CSV or Parquet."
+            )
+    
+    # Default to CSV - basic validation will happen during read
     return "csv"
 
 
 def _read_csv(file_bytes: bytes) -> pd.DataFrame:
-    """Read CSV file with error handling."""
+    """Read CSV file with error handling and validation.
+    
+    Validates that the file is actually a CSV by attempting to parse it.
+    """
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=422, detail="CSV file is empty")
+    
+    # Basic CSV validation: should contain at least one newline or comma
+    # This helps catch cases where binary files are misidentified as CSV
     try:
-        return pd.read_csv(io.BytesIO(file_bytes))
+        # Try to decode as UTF-8 first (most common encoding)
+        text_preview = file_bytes[:1024].decode('utf-8', errors='ignore')
+        if not any(c in text_preview for c in [',', ';', '\t', '\n', '\r']):
+            raise HTTPException(
+                status_code=422,
+                detail="File does not appear to be a valid CSV (no delimiters found). "
+                       "Please ensure the file is a CSV or Parquet file."
+            )
+    except UnicodeDecodeError:
+        # If we can't decode as UTF-8, it's likely not a text file
+        raise HTTPException(
+            status_code=422,
+            detail="File does not appear to be a valid CSV (not UTF-8 text). "
+                   "Please ensure the file is a CSV or Parquet file."
+        )
+    
+    try:
+        df = pd.read_csv(io.BytesIO(file_bytes))
+        if df.empty:
+            raise HTTPException(status_code=422, detail="CSV file contains no data rows")
+        return df
     except pd.errors.EmptyDataError:
         raise HTTPException(status_code=422, detail="CSV file is empty")
     except pd.errors.ParserError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid CSV format: {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid CSV format: {str(e)}. Please check the file format and encoding."
+        )
+    except MemoryError:
+        raise HTTPException(
+            status_code=413,
+            detail="CSV file is too large to process. Please reduce file size or use Parquet format."
+        )
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Error reading CSV file: {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Error reading CSV file: {str(e)}. Please verify the file is a valid CSV."
+        )
 
 
 def _read_parquet(file_bytes: bytes) -> pd.DataFrame:
-    """Read Parquet file with error handling."""
+    """Read Parquet file with error handling and validation.
+    
+    Validates that the file is actually a Parquet file by attempting to parse it.
+    """
+    if len(file_bytes) < 4:
+        raise HTTPException(status_code=422, detail="Parquet file is too small or corrupted")
+    
+    # Verify magic number again (defense in depth)
+    if file_bytes[:4] != b"PAR1":
+        raise HTTPException(
+            status_code=422,
+            detail="File does not have Parquet magic number. Please ensure the file is a valid Parquet file."
+        )
+    
     try:
         table = pq.read_table(io.BytesIO(file_bytes))
-        return table.to_pandas()
+        df = table.to_pandas()
+        if df.empty:
+            raise HTTPException(status_code=422, detail="Parquet file contains no data rows")
+        return df
+    except MemoryError:
+        raise HTTPException(
+            status_code=413,
+            detail="Parquet file is too large to process. Please reduce file size."
+        )
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Error reading Parquet file: {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Error reading Parquet file: {str(e)}. Please verify the file is a valid Parquet file."
+        )
 
 
 @router.post("/fuse/upload", response_model=FuseResponse)

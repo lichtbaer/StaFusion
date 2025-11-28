@@ -80,14 +80,20 @@ def create_app() -> FastAPI:
     async def limit_body_size(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        # Skip body size check for multipart/form-data (file uploads handled separately)
+        content_type = request.headers.get("content-type", "")
+        if "multipart/form-data" in content_type:
+            return await call_next(request)
+        
         # Read body to check size, then recreate request with body for downstream handlers
         body = await request.body()
         if len(body) > max_bytes:
             return Response(status_code=413, content="Request entity too large")
         
         # Recreate request with body so downstream handlers can read it
+        # This is necessary because request.body() consumes the stream
         async def receive() -> dict:
-            return {"type": "http.request", "body": body}
+            return {"type": "http.request", "body": body, "more_body": False}
         
         request._receive = receive  # type: ignore[attr-defined]
         return await call_next(request)
