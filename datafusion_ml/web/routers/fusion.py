@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pyarrow.parquet as pq
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Request, UploadFile
 
 from ...service.fusion_service import perform_fusion
 from ..config import APISettings
@@ -130,7 +130,7 @@ def _load_persisted_jobs() -> None:
         logger.error(f"Failed to load persisted jobs: {str(e)}")
 
 
-def _cleanup_old_jobs() -> None:
+def cleanup_old_jobs() -> None:
     """Remove jobs older than JOB_TTL_SECONDS from the store.
     
     This function is thread-safe and should be called regularly to prevent
@@ -153,17 +153,31 @@ def _cleanup_old_jobs() -> None:
 
 
 @router.post("/fuse", response_model=FuseResponse)
-def fuse(req: FuseRequest) -> FuseResponse:
+def fuse(req: FuseRequest, request: Request) -> FuseResponse:
+    """Synchronous fusion endpoint with request ID correlation."""
     settings = APISettings.from_env()
     # Enforce row limit from settings if provided
     if req.row_limit is not None and req.row_limit > settings.max_rows:
         raise HTTPException(status_code=413, detail="Row limit exceeds configured maximum")
-    return perform_fusion(req)
+    
+    # Use request logger if available for correlation
+    request_logger = getattr(request.state, "logger", logger)
+    request_logger.info("Processing synchronous fusion request")
+    try:
+        result = perform_fusion(req)
+        request_logger.info("Fusion completed successfully")
+        return result
+    except Exception as e:
+        request_logger.error(f"Fusion failed: {str(e)}", exc_info=True)
+        raise
 
 
 def _run_fusion_job(job_id: str, req: FuseRequest) -> None:
     """Run fusion job in background and update job store."""
+    # Create logger adapter with job_id context for correlation
+    job_logger = logging.LoggerAdapter(logger, extra={"job_id": job_id})
     try:
+        job_logger.info("Starting fusion job")
         result = perform_fusion(req)
         timestamp = time.time()
         job_data = {"status": "done", "result": result.model_dump()}  # type: ignore[attr-defined]
@@ -171,7 +185,7 @@ def _run_fusion_job(job_id: str, req: FuseRequest) -> None:
             _JOB_STORE[job_id] = job_data
             _JOB_TIMESTAMPS[job_id] = timestamp
         _save_job(job_id, job_data, timestamp)
-        logger.info(f"Job {job_id} completed successfully")
+        job_logger.info("Job completed successfully")
     except Exception as e:  # noqa: BLE001
         timestamp = time.time()
         job_data = {"status": "error", "error": str(e)}
@@ -179,11 +193,11 @@ def _run_fusion_job(job_id: str, req: FuseRequest) -> None:
             _JOB_STORE[job_id] = job_data
             _JOB_TIMESTAMPS[job_id] = timestamp
         _save_job(job_id, job_data, timestamp)
-        logger.error(f"Job {job_id} failed: {str(e)}", exc_info=True)
+        job_logger.error(f"Job failed: {str(e)}", exc_info=True)
 
 
 @router.post("/fuse/async")
-def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
+def fuse_async(req: FuseRequest, request: Request, tasks: BackgroundTasks) -> Dict[str, str]:
     """Create a new async fusion job."""
     settings = APISettings.from_env()
     # Initialize persistence on first use
@@ -191,7 +205,7 @@ def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
         _init_persistence(settings)
     
     # Cleanup old jobs before creating new one
-    _cleanup_old_jobs()
+    cleanup_old_jobs()
     
     job_id = str(uuid.uuid4())
     timestamp = time.time()
@@ -201,7 +215,16 @@ def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
         _JOB_TIMESTAMPS[job_id] = timestamp
     _save_job(job_id, job_data, timestamp)
     tasks.add_task(_run_fusion_job, job_id, req)
-    logger.info(f"Created async job {job_id}")
+    
+    # Use request logger if available for correlation
+    request_logger = getattr(request.state, "logger", logger)
+    if hasattr(request_logger, "extra"):
+        request_logger = logging.LoggerAdapter(
+            logger, extra={**request_logger.extra, "job_id": job_id}
+        )
+    else:
+        request_logger = logging.LoggerAdapter(logger, extra={"job_id": job_id})
+    request_logger.info("Created async fusion job")
     return {"job_id": job_id}
 
 
@@ -214,7 +237,7 @@ def fuse_async_status(job_id: str) -> Dict[str, Any]:
         _init_persistence(settings)
     
     # Cleanup old jobs on access
-    _cleanup_old_jobs()
+    cleanup_old_jobs()
     
     with _JOB_STORE_LOCK:
         data = _JOB_STORE.get(job_id)

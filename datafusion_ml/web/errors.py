@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from ..errors import OverlapError, TargetsError, ConfigurationError
+from ..errors import OverlapError, TargetsError, ConfigurationError, ValidationError
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -17,6 +17,10 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(ConfigurationError)
     async def _config_handler(_, exc: ConfigurationError):  # type: ignore[no-untyped-def]
+        return _json_exc(422, str(exc))
+
+    @app.exception_handler(ValidationError)
+    async def _validation_handler(_, exc: ValidationError):  # type: ignore[no-untyped-def]
         return _json_exc(422, str(exc))
 
 

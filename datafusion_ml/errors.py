@@ -13,3 +13,7 @@ class TargetsError(DataFusionError):
 class ConfigurationError(DataFusionError):
     """Raised for invalid configuration values or unsupported combinations."""
 
+
+class ValidationError(DataFusionError):
+    """Raised when input data validation fails."""
+
