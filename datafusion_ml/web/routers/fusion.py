@@ -130,7 +130,7 @@ def _load_persisted_jobs() -> None:
         logger.error(f"Failed to load persisted jobs: {str(e)}")
 
 
-def _cleanup_old_jobs() -> None:
+def cleanup_old_jobs() -> None:
     """Remove jobs older than JOB_TTL_SECONDS from the store.
     
     This function is thread-safe and should be called regularly to prevent
@@ -191,7 +191,7 @@ def fuse_async(req: FuseRequest, tasks: BackgroundTasks) -> Dict[str, str]:
         _init_persistence(settings)
     
     # Cleanup old jobs before creating new one
-    _cleanup_old_jobs()
+    cleanup_old_jobs()
     
     job_id = str(uuid.uuid4())
     timestamp = time.time()
@@ -214,7 +214,7 @@ def fuse_async_status(job_id: str) -> Dict[str, Any]:
         _init_persistence(settings)
     
     # Cleanup old jobs on access
-    _cleanup_old_jobs()
+    cleanup_old_jobs()
     
     with _JOB_STORE_LOCK:
         data = _JOB_STORE.get(job_id)

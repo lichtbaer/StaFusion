@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Dict, Callable, Awaitable
 
@@ -13,7 +14,7 @@ from starlette.responses import Response
 from .config import APISettings
 from .errors import register_exception_handlers
 from .middleware import RateLimiter, jwt_auth_middleware, rate_limit_middleware
-from .routers.fusion import router as fusion_router
+from .routers.fusion import router as fusion_router, cleanup_old_jobs
 
 
 logger = logging.getLogger(__name__)
@@ -42,10 +43,15 @@ def create_app() -> FastAPI:
     app = FastAPI(title="datafusion-ml API", version="0.1.0")
 
     if settings.cors_enabled:
-        # If no origins specified, default to allowing all (for backward compatibility)
-        # but log a warning for production awareness
-        cors_origins = settings.cors_origins if settings.cors_origins else ["*"]
-        if cors_origins == ["*"]:
+        # Use provided origins or empty list (which disables CORS)
+        # Empty list is safer default than ["*"] for production
+        cors_origins = settings.cors_origins if settings.cors_origins else []
+        if not cors_origins:
+            logger.warning(
+                "CORS is enabled but no origins specified. CORS will be effectively disabled. "
+                "Set DFML_CORS_ORIGINS to specific origins or disable CORS with DFML_CORS_ENABLED=false."
+            )
+        elif "*" in cors_origins:
             logger.warning(
                 "CORS is configured to allow all origins (*). "
                 "This is not recommended for production. "
@@ -139,6 +145,23 @@ def create_app() -> FastAPI:
         
         request._receive = receive  # type: ignore[attr-defined]
         return await call_next(request)
+
+    # Periodic cleanup task for async jobs
+    @app.on_event("startup")
+    async def startup_cleanup_task() -> None:
+        """Start background task for periodic job cleanup."""
+        async def periodic_cleanup() -> None:
+            """Run cleanup every 5 minutes."""
+            while True:
+                await asyncio.sleep(300)  # 5 minutes
+                try:
+                    cleanup_old_jobs()
+                except Exception as e:
+                    logger.error(f"Error during periodic job cleanup: {str(e)}", exc_info=True)
+        
+        # Start cleanup task in background
+        asyncio.create_task(periodic_cleanup())
+        logger.info("Periodic job cleanup task started (runs every 5 minutes)")
 
     return app
 
