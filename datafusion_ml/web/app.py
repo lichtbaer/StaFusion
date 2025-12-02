@@ -13,7 +13,12 @@ from starlette.responses import Response
 
 from .config import APISettings
 from .errors import register_exception_handlers
-from .middleware import RateLimiter, jwt_auth_middleware, rate_limit_middleware
+from .middleware import (
+    RateLimiter,
+    jwt_auth_middleware,
+    rate_limit_middleware,
+    request_id_middleware,
+)
 from .routers.fusion import router as fusion_router, cleanup_old_jobs
 
 
@@ -66,6 +71,13 @@ def create_app() -> FastAPI:
         )
 
     register_exception_handlers(app)
+
+    # Request ID middleware (always enabled for logging correlation)
+    @app.middleware("http")
+    async def request_id(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        return await request_id_middleware(request, call_next)
 
     # Rate limiting middleware (if enabled)
     if settings.rate_limit_enabled:

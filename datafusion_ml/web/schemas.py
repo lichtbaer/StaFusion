@@ -35,9 +35,34 @@ class FuseRequest(BaseModel):
 
 
 class FuseResponse(BaseModel):
-    fused: Optional[List[Dict[str, Any]]] = None
-    a_enriched: Optional[List[Dict[str, Any]]] = None
-    b_enriched: Optional[List[Dict[str, Any]]] = None
-    metrics_a_to_b: Optional[Dict[str, Dict[str, float]]] = None
-    metrics_b_to_a: Optional[Dict[str, Dict[str, float]]] = None
+    fused: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Fused dataset combining both datasets with predicted values"
+    )
+    a_enriched: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Dataset A enriched with predictions from dataset B"
+    )
+    b_enriched: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Dataset B enriched with predictions from dataset A"
+    )
+    metrics_a_to_b: Optional[Dict[str, Dict[str, float]]] = Field(
+        default=None,
+        description=(
+            "Cross-validation metrics for models predicting targets from A in B. "
+            "For classification: accuracy, f1_macro, roc_auc_ovr. "
+            "For regression: r2, rmse, mae. "
+            "May be empty if insufficient data for cross-validation."
+        )
+    )
+    metrics_b_to_a: Optional[Dict[str, Dict[str, float]]] = Field(
+        default=None,
+        description=(
+            "Cross-validation metrics for models predicting targets from B in A. "
+            "For classification: accuracy, f1_macro, roc_auc_ovr. "
+            "For regression: r2, rmse, mae. "
+            "May be empty if insufficient data for cross-validation."
+        )
+    )
 

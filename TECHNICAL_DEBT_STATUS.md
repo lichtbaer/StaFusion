@@ -52,79 +52,56 @@ Stand: Aktuell nach Implementierung der kritischen Fixes
 
 ---
 
-## ⚠️ Teilweise behoben (2/6)
+## ✅ Behoben (6/6)
 
 ### 15. Unvollständige Metriken-Export
-**Status:** ⚠️ **TEILWEISE BEHOBEN**
+**Status:** ✅ **BEHOBEN**
 
-**Was funktioniert:**
-- NaN-Werte werden korrekt entfernt (`_clean` Funktion)
-- Metriken werden für Classification und Regression berechnet
-
-**Was fehlt:**
-- Keine Dokumentation welche Metriken wann verfügbar sind
-- Keine Validierung ob Metriken vollständig sind
-- Keine Warnung wenn Metriken leer sind (z.B. bei zu wenigen Samples)
-
-**Empfohlene Verbesserungen:**
-- Dokumentation in API-Docs hinzufügen
-- Explizite Behandlung von leeren Metriken-Dicts
-- Logging wenn Metriken nicht berechnet werden können
+**Implementiert:**
+- Vollständige Dokumentation in Pydantic-Schema (FuseResponse)
+- Explizite Beschreibung welche Metriken für Classification vs. Regression verfügbar sind
+- Validierung: Leere Metriken-Dicts werden als `None` zurückgegeben
+- Logging-Warnung wenn Metriken leer sind (z.B. bei zu wenigen Samples)
+- Verbesserte `_clean` Funktion die nur gültige Metriken zurückgibt
 
 **Dateien:**
-- `datafusion_ml/service/fusion_service.py:79-87`
-- `datafusion_ml/modeling.py:250-300`
+- `datafusion_ml/service/fusion_service.py:79-107`
+- `datafusion_ml/web/schemas.py:37-58`
 
 ---
 
 ### 17. Unvollständige Logging-Korrelation
-**Status:** ⚠️ **TEILWEISE BEHOBEN**
+**Status:** ✅ **BEHOBEN**
 
-**Was funktioniert:**
-- Job-ID wird in allen Logs für async Jobs verwendet
-- Fehler werden geloggt mit `exc_info=True`
-
-**Was fehlt:**
-- Keine Request-ID-Korrelation für synchrone Requests
-- Keine strukturierte Logging-Kontext-Information
-- Request-ID wird nicht durch Middleware propagiert
-
-**Empfohlene Verbesserungen:**
-- Request-ID-Middleware hinzufügen (UUID pro Request)
-- Request-ID in alle Logs einbinden
-- Strukturiertes Logging mit Kontext (z.B. `extra={"request_id": ..., "job_id": ...}`)
+**Implementiert:**
+- Request-ID-Middleware hinzugefügt (generiert UUID pro Request)
+- Request-ID wird in Response-Header `X-Request-ID` zurückgegeben
+- Strukturiertes Logging mit `LoggerAdapter` für Request-ID und Job-ID
+- Request-ID wird in allen synchronen Requests korreliert
+- Job-ID wird in allen async Job-Logs korreliert
+- Request-ID kann auch vom Client über `X-Request-ID` Header gesetzt werden
 
 **Dateien:**
-- `datafusion_ml/web/routers/fusion.py:164-182`
-- `datafusion_ml/web/app.py` (neue Middleware nötig)
+- `datafusion_ml/web/middleware.py:177-210`
+- `datafusion_ml/web/app.py:73-78`
+- `datafusion_ml/web/routers/fusion.py:155-161, 164-196, 199-220`
 
 ---
 
-## ❌ Noch offen (1/6)
-
 ### 18. Fehlende Input-Validierung für DataFrame-Spalten
-**Status:** ❌ **OFFEN**
+**Status:** ✅ **BEHOBEN**
 
-**Problem:**
-- Keine Validierung ob Records konsistent sind (gleiche Spalten)
-- Leere DataFrames werden nicht explizit abgefangen
-- Keine Prüfung auf erforderliche Spalten
-- Keine Validierung der Datentypen
-
-**Aktueller Code:**
-```python
-df_a = pd.DataFrame.from_records(req.df_a)
-df_b = pd.DataFrame.from_records(req.df_b)
-```
-
-**Empfohlene Verbesserungen:**
-- Validierung dass alle Records die gleichen Keys haben
-- Explizite Prüfung auf leere DataFrames mit klarer Fehlermeldung
-- Optional: Schema-Validierung mit Pydantic
-- Validierung dass überlappende Features existieren
+**Implementiert:**
+- Validierung dass alle Records konsistente Spalten haben
+- Explizite Prüfung auf leere DataFrames mit klaren Fehlermeldungen
+- Validierung dass DataFrames nicht leer sind nach dem Erstellen
+- Neue `ValidationError` Exception-Klasse
+- Exception-Handler für ValidationError registriert (HTTP 422)
 
 **Dateien:**
-- `datafusion_ml/service/fusion_service.py:33-35`
+- `datafusion_ml/service/fusion_service.py:33-79`
+- `datafusion_ml/errors.py:17-19`
+- `datafusion_ml/web/errors.py:6, 21-23`
 
 ---
 
@@ -134,14 +111,11 @@ df_b = pd.DataFrame.from_records(req.df_b)
 |---------|--------|-----------|
 | 13. Authentifizierung | ✅ Behoben | Hoch |
 | 14. Job Persistenz | ✅ Behoben | Hoch |
-| 15. Metriken-Export | ⚠️ Teilweise | Mittel |
+| 15. Metriken-Export | ✅ Behoben | Mittel |
 | 16. Rate Limiting | ✅ Behoben | Hoch |
-| 17. Logging-Korrelation | ⚠️ Teilweise | Mittel |
-| 18. Input-Validierung | ❌ Offen | Mittel |
+| 17. Logging-Korrelation | ✅ Behoben | Mittel |
+| 18. Input-Validierung | ✅ Behoben | Mittel |
 
-**Fortschritt:** 3/6 vollständig behoben, 2/6 teilweise behoben, 1/6 offen
+**Fortschritt:** 6/6 vollständig behoben ✅
 
-**Nächste Schritte:**
-1. Input-Validierung für DataFrame-Spalten implementieren (Problem 18)
-2. Request-ID-Middleware für Logging-Korrelation (Problem 17)
-3. Metriken-Dokumentation und Validierung verbessern (Problem 15)
+**Alle technischen Schulden wurden erfolgreich behoben!**
