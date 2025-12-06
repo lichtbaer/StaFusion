@@ -5,103 +5,52 @@
 
 ---
 
-## ✅ Sofort erledigt
+## ✅ Erledigt
 
-1. **Request-ID-Middleware implementiert**
+1. **Request-ID-Middleware implementiert und getestet**
    - Funktion `request_id_middleware` in `middleware.py` hinzugefügt
    - UUID-Generierung, Request-State, Response-Header
    - Logger-Adapter für Korrelation
+   - Tests hinzugefügt (`tests/test_middleware.py`)
 
----
+2. **Frontend-Tests eingerichtet**
+   - Vitest konfiguriert
+   - Test-Setup erstellt
+   - Unit-Tests für State-Management und API-Client
 
-## 🔴 Kritische Priorität (Diese Woche)
+3. **CI/CD Pipeline erweitert**
+   - Frontend-Job in CI
+   - Frontend-Tests und Build integriert
+   - Build-Artefakte werden hochgeladen
 
-### 1. Request-ID-Middleware testen
-**Aufwand:** 1-2 Stunden  
-**Ziel:** Sicherstellen, dass Middleware korrekt funktioniert
-
-- [ ] Unit-Test für `request_id_middleware` schreiben
-- [ ] Integration-Test: Request-ID in Logs prüfen
-- [ ] Response-Header `X-Request-ID` validieren
-- [ ] Client-provided Request-ID testen
-
-**Dateien:**
-- `tests/test_middleware.py` (neu)
-- `tests/test_api_extended.py` (erweitern)
+4. **README aktualisiert**
+   - Badge-Platzhalter entfernt
+   - Deployment-Guide erstellt (`docs/deployment.md`)
+   - Konfigurationsdokumentation erweitert
 
 ---
 
 ## 🟡 Hohe Priorität (Nächste 2 Wochen)
 
-### 2. Frontend-Tests einrichten
+### 1. Frontend-Tests erweitern
 **Aufwand:** 2-3 Tage  
-**Ziel:** Test-Abdeckung für Frontend schaffen
+**Ziel:** Test-Abdeckung für Frontend erhöhen
 
 **Schritte:**
-1. Vitest konfigurieren
-   - [ ] `vitest.config.ts` erstellen
-   - [ ] Testing Library installieren
-   - [ ] Mock-Setup für API-Client
-
-2. Unit-Tests für State-Management
-   - [ ] `AppState.tsx` testen
-   - [ ] State-Transitions testen
-   - [ ] Error-Handling testen
-
-3. Komponententests
+1. Komponententests
    - [ ] `FileDrop.tsx` testen
    - [ ] `UploadPage.tsx` testen
    - [ ] `ResultsPage.tsx` testen
    - [ ] Wizard-Navigation testen
 
-4. CI-Integration
-   - [ ] Frontend-Tests in `.github/workflows/ci.yml` hinzufügen
-   - [ ] Test-Report als Artefakt speichern
-
-**Dateien:**
-- `frontend/packages/datafusion-mfe/vitest.config.ts` (neu)
-- `frontend/packages/datafusion-mfe/src/**/*.test.tsx` (neu)
-- `.github/workflows/ci.yml` (erweitern)
-
----
-
-### 3. CI/CD Pipeline erweitern
-**Aufwand:** 1-2 Tage  
-**Ziel:** Vollständige CI/CD für Frontend und Backend
-
-**Schritte:**
-1. Frontend-Build in CI
-   - [ ] Node.js Setup in CI
-   - [ ] Frontend-Build-Job
-   - [ ] Build-Artefakt speichern
-
-2. Frontend-Tests in CI
-   - [ ] Vitest-Job
-   - [ ] TypeScript-Check
-   - [ ] ESLint (falls konfiguriert)
-
-3. E2E-Tests (optional, später)
+2. E2E-Tests (optional)
    - [ ] Playwright-Setup
    - [ ] Docker Compose für lokales Backend
-   - [ ] E2E-Test-Job
+   - [ ] E2E-Test-Job in CI
 
 **Dateien:**
-- `.github/workflows/ci.yml` (erweitern)
-- `docker-compose.yml` (neu, für E2E)
-
----
-
-### 4. README aktualisieren
-**Aufwand:** 1-2 Stunden  
-**Ziel:** Dokumentation vervollständigen
-
-- [ ] Badge-Platzhalter `ORG/REPO` ersetzen
-- [ ] Deployment-Guide hinzufügen
-- [ ] Nginx-Beispiele dokumentieren
-- [ ] Environment-Variablen vollständig dokumentieren
-
-**Dateien:**
-- `README.md`
+- `frontend/packages/datafusion-mfe/src/**/*.test.tsx` (erweitern)
+- `tests/e2e/` (neu, optional)
 
 ---
 
