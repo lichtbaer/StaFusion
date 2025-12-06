@@ -175,3 +175,39 @@ async def jwt_auth_middleware(
         )
     
     return await call_next(request)
+
+
+async def request_id_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Request ID middleware for logging correlation.
+    
+    Generates a unique request ID (UUID) for each request and:
+    - Stores it in request.state for use in route handlers
+    - Adds it to response header X-Request-ID
+    - Creates a logger adapter with request_id for correlation
+    
+    If X-Request-ID header is provided by client, it will be used instead.
+    """
+    # Check if client provided request ID
+    client_request_id = request.headers.get("X-Request-ID")
+    if client_request_id:
+        request_id = client_request_id
+    else:
+        request_id = str(uuid.uuid4())
+    
+    # Store in request state for use in route handlers
+    request.state.request_id = request_id  # type: ignore[attr-defined]
+    
+    # Create logger adapter with request_id for correlation
+    request_logger = logging.LoggerAdapter(logger, extra={"request_id": request_id})
+    request.state.logger = request_logger  # type: ignore[attr-defined]
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Add request ID to response header
+    response.headers["X-Request-ID"] = request_id
+    
+    return response

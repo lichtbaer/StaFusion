@@ -1,7 +1,7 @@
 # datafusion-ml
 
-[![CI](https://img.shields.io/github/actions/workflow/status/ORG/REPO/ci.yml?branch=main)](https://github.com/ORG/REPO/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-mkdocs--material-blue)](https://ORG.github.io/REPO/)
+[![CI](https://img.shields.io/github/actions/workflow/status/lichtbaer/datafusion-ml/ci.yml?branch=main)](https://github.com/lichtbaer/datafusion-ml/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs--material-blue)](https://lichtbaer.github.io/datafusion-ml/)
 [![PyPI](https://img.shields.io/pypi/v/datafusion-ml.svg)](https://pypi.org/project/datafusion-ml/)
 
 Bibliothek für statistische Fusion zweier Datensätze auf Basis überlappender Merkmale. Die Bibliothek nutzt PyCaret zur Modellierung (Klassifikation/Regression), um fehlende Variablen aus Datensatz A in B (und umgekehrt) vorherzusagen und die Datensätze zu einem gemeinsamen, angereicherten Datensatz zu vereinen.
@@ -81,17 +81,35 @@ docker run --rm -p 8000:8000 \
 
 ### Konfiguration (Environment-Variablen, Prefix `DFML_`)
 
+**CORS:**
 - `CORS_ENABLED` (bool, Default: `true`)
-- `CORS_ORIGINS` (CSV-Liste, Default: `*`)
+- `CORS_ORIGINS` (CSV-Liste, Default: leere Liste - keine CORS)
 - `CORS_ALLOW_CREDENTIALS` (bool, Default: `false`)
-- `CORS_ALLOW_METHODS` (CSV-Liste, Default: `*`)
-- `CORS_ALLOW_HEADERS` (CSV-Liste, Default: `*`)
+- `CORS_ALLOW_METHODS` (CSV-Liste, Default: `["GET", "POST", "OPTIONS"]`)
+- `CORS_ALLOW_HEADERS` (CSV-Liste, Default: `["Content-Type", "Accept"]`)
+
+**Authentifizierung:**
+- `JWT_ENABLED` (bool, Default: `false`)
+- `JWT_SECRET` (string, Required wenn JWT_ENABLED=true)
+- `JWT_ALGORITHM` (string, Default: `"HS256"`)
+
+**Rate Limiting:**
+- `RATE_LIMIT_ENABLED` (bool, Default: `false`)
+- `RATE_LIMIT_PER_MINUTE` (int, Default: `60`)
+
+**Job Persistenz:**
+- `JOB_PERSISTENCE_ENABLED` (bool, Default: `false`)
+- `JOB_PERSISTENCE_PATH` (string, Default: `"/tmp/datafusion-ml-jobs"`)
+
+**Allgemein:**
 - `ENABLE_METRICS` (bool, Default: `true`)
 - `ENABLE_UNVERSIONED_ROUTES` (bool, Default: `true`)
 - `MAX_BODY_MB` (int, Default: `50`)
 - `MAX_ROWS` (int, Default: `200000`)
-- `LOG_LEVEL` (`DEBUG|INFO|...`, Default: `INFO`)
+- `LOG_LEVEL` (`DEBUG|INFO|WARNING|ERROR`, Default: `INFO`)
 - `LOG_FORMAT` (`json|plain`, Default: `json`)
+
+**Siehe auch:** [Deployment Guide](docs/deployment.md) für detaillierte Konfiguration und Produktionseinsatz.
 
 ## Quickstart
 
@@ -151,6 +169,15 @@ pip install -e .[dev]
 mypy datafusion_ml
 ```
 - Hinweis: Für optionale Third-Party-Typen werden Stubs via `dev`-Extras installiert (z. B. `pandas-stubs`). In CI wird `mypy` automatisch ausgeführt.
+
+## Deployment
+
+Für detaillierte Deployment-Anleitungen siehe [docs/deployment.md](docs/deployment.md).
+
+**Kurze Übersicht:**
+- **Backend:** Docker, Nginx Reverse Proxy, Kubernetes
+- **Frontend:** Statische SPA, Web Component, Docker
+- **Vollständig:** Docker Compose für Full-Stack-Deployment
 
 ## Hinweise & Limitierungen
 - Bei sehr vielen Kategorien in überlappenden Merkmalen empfiehlt sich `use_sparse_onehot=True` (Standard), um Speicher zu sparen.
