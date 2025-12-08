@@ -145,13 +145,29 @@ def create_app() -> FastAPI:
         if "multipart/form-data" in content_type:
             return await call_next(request)
         
+        # For JSON requests, try to use Content-Length header to avoid reading body twice
+        # FastAPI/Pydantic will read the body automatically for JSON requests
+        if "application/json" in content_type:
+            content_length = request.headers.get("content-length")
+            if content_length:
+                try:
+                    body_size = int(content_length)
+                    if body_size > max_bytes:
+                        return Response(status_code=413, content="Request entity too large")
+                    # Content-Length check passed, let FastAPI read the body normally
+                    return await call_next(request)
+                except ValueError:
+                    # Invalid Content-Length, fall through to body reading
+                    pass
+        
+        # For non-JSON or when Content-Length is not available:
         # Read body to check size, then recreate request with body for downstream handlers
+        # This is necessary because request.body() consumes the stream
         body = await request.body()
         if len(body) > max_bytes:
             return Response(status_code=413, content="Request entity too large")
         
         # Recreate request with body so downstream handlers can read it
-        # This is necessary because request.body() consumes the stream
         async def receive() -> dict:
             return {"type": "http.request", "body": body, "more_body": False}
         
