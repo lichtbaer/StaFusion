@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api" class="md-skip">
+        <a href="#api-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -282,6 +282,8 @@
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
       
+        
+      
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
           
@@ -324,6 +326,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -332,22 +336,172 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#api" class="md-nav__link">
+  <a href="#python-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        API
+        Python API
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="API">
+    <nav class="md-nav" aria-label="Python API">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fuse_datasetsdf_a-df_b-overlap_featuresnone-targets_from_anone-targets_from_bnone-problem_type_mapnone-prefer_pycarettrue-random_state42" class="md-nav__link">
+  <a href="#fuse_datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        fuse_datasets(df_a, df_b, overlap_features=None, targets_from_a=None, targets_from_b=None, problem_type_map=None, prefer_pycaret=True, random_state=42)
+        fuse_datasets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fuse_datasets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fusionconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FusionConfig
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FusionConfig">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REST API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="REST API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-v1fuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/fuse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1fuseasync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/fuse/async
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-v1fuseasyncjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /v1/fuse/async/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1fuseupload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/fuse/upload
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-v1health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /v1/health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /metrics
       
     </span>
   </a>
@@ -518,6 +672,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -535,6 +716,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -543,22 +726,172 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#api" class="md-nav__link">
+  <a href="#python-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        API
+        Python API
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="API">
+    <nav class="md-nav" aria-label="Python API">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fuse_datasetsdf_a-df_b-overlap_featuresnone-targets_from_anone-targets_from_bnone-problem_type_mapnone-prefer_pycarettrue-random_state42" class="md-nav__link">
+  <a href="#fuse_datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        fuse_datasets(df_a, df_b, overlap_features=None, targets_from_a=None, targets_from_b=None, problem_type_map=None, prefer_pycaret=True, random_state=42)
+        fuse_datasets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fuse_datasets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fusionconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FusionConfig
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FusionConfig">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REST API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="REST API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-v1fuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/fuse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1fuseasync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/fuse/async
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-v1fuseasyncjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /v1/fuse/async/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-v1fuseupload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /v1/fuse/upload
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-v1health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /v1/health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /metrics
       
     </span>
   </a>
@@ -587,16 +920,151 @@
 
 
 
-  <h1>API</h1>
+<h1 id="api-reference">API Reference</h1>
+<h2 id="python-api">Python API</h2>
+<h3 id="fuse_datasets"><code>fuse_datasets</code></h3>
+<p>Main function for fusing two datasets.</p>
+<pre><code class="language-python">from datafusion_ml.fusion import fuse_datasets
+from datafusion_ml.config import FusionConfig
 
-<h2 id="api">API</h2>
-<h3 id="fuse_datasetsdf_a-df_b-overlap_featuresnone-targets_from_anone-targets_from_bnone-problem_type_mapnone-prefer_pycarettrue-random_state42">fuse_datasets(df_a, df_b, overlap_features=None, targets_from_a=None, targets_from_b=None, problem_type_map=None, prefer_pycaret=True, random_state=42)</h3>
-<p>Returns a <code>FusionResult</code> with:
-- <code>fused</code>: fused DataFrame
-- <code>a_enriched</code>: A enriched with predictions from B-only columns
-- <code>b_enriched</code>: B enriched with predictions from A-only columns
-- <code>models_a_to_b</code> and <code>models_b_to_a</code>: trained models
-- <code>metrics_a_to_b</code> and <code>metrics_b_to_a</code>: cross-validated metrics</p>
+result = fuse_datasets(
+    df_a: pd.DataFrame,
+    df_b: pd.DataFrame,
+    overlap_features: Optional[Sequence[str]] = None,
+    targets_from_a: Optional[Sequence[str]] = None,
+    targets_from_b: Optional[Sequence[str]] = None,
+    problem_type_map: Optional[Dict[str, ProblemType]] = None,
+    prefer_pycaret: bool = True,
+    random_state: int = 42,
+    *,
+    config: Optional[FusionConfig] = None,
+) -&gt; FusionResult
+</code></pre>
+<h4 id="parameters">Parameters</h4>
+<ul>
+<li><strong>df_a</strong> (<code>pd.DataFrame</code>): First dataset</li>
+<li><strong>df_b</strong> (<code>pd.DataFrame</code>): Second dataset</li>
+<li><strong>overlap_features</strong> (<code>Optional[Sequence[str]]</code>): Explicit list of overlapping feature names. If <code>None</code>, automatically inferred as the intersection of columns in A and B (excluding targets)</li>
+<li><strong>targets_from_a</strong> (<code>Optional[Sequence[str]]</code>): Explicit list of target column names from dataset A. If <code>None</code>, automatically inferred as columns exclusive to A</li>
+<li><strong>targets_from_b</strong> (<code>Optional[Sequence[str]]</code>): Explicit list of target column names from dataset B. If <code>None</code>, automatically inferred as columns exclusive to B</li>
+<li><strong>problem_type_map</strong> (<code>Optional[Dict[str, ProblemType]]</code>): Manual mapping of target names to problem types (<code>ProblemType.CLASSIFICATION</code> or <code>ProblemType.REGRESSION</code>). If <code>None</code>, automatically detected</li>
+<li><strong>prefer_pycaret</strong> (<code>bool</code>): Whether to prefer PyCaret over scikit-learn (default: <code>True</code>). Ignored if <code>config</code> is provided</li>
+<li><strong>random_state</strong> (<code>int</code>): Random seed for reproducibility (default: <code>42</code>). Ignored if <code>config</code> is provided</li>
+<li><strong>config</strong> (<code>Optional[FusionConfig]</code>): Advanced configuration object. If provided, overrides <code>prefer_pycaret</code> and <code>random_state</code> parameters</li>
+</ul>
+<h4 id="returns">Returns</h4>
+<p><code>FusionResult</code> object with the following attributes:</p>
+<ul>
+<li><strong>fused</strong> (<code>pd.DataFrame</code>): Combined dataset with all rows from A and B, including predicted values</li>
+<li><strong>a_enriched</strong> (<code>pd.DataFrame</code>): Dataset A enriched with predictions from B-only columns</li>
+<li><strong>b_enriched</strong> (<code>pd.DataFrame</code>): Dataset B enriched with predictions from A-only columns</li>
+<li><strong>models_a_to_b</strong> (<code>Dict[str, TrainedModel]</code>): Trained models for predicting targets from A in B (keyed by target name)</li>
+<li><strong>models_b_to_a</strong> (<code>Dict[str, TrainedModel]</code>): Trained models for predicting targets from B in A (keyed by target name)</li>
+<li><strong>metrics_a_to_b</strong> (<code>Dict[str, ClassificationMetrics | RegressionMetrics]</code>): Cross-validation metrics for A-&gt;B predictions</li>
+<li><strong>metrics_b_to_a</strong> (<code>Dict[str, ClassificationMetrics | RegressionMetrics]</code>): Cross-validation metrics for B-&gt;A predictions</li>
+</ul>
+<h4 id="example">Example</h4>
+<pre><code class="language-python">import pandas as pd
+from datafusion_ml.fusion import fuse_datasets
+from datafusion_ml.config import FusionConfig
+
+A = pd.DataFrame({
+    &quot;age_group&quot;: [&quot;18-29&quot;, &quot;30-44&quot;],
+    &quot;income&quot;: [&quot;low&quot;, &quot;mid&quot;],
+    &quot;target_a&quot;: [1, 0],
+})
+
+B = pd.DataFrame({
+    &quot;age_group&quot;: [&quot;18-29&quot;, &quot;30-44&quot;],
+    &quot;income&quot;: [&quot;mid&quot;, &quot;high&quot;],
+    &quot;target_b&quot;: [3.2, 1.5],
+})
+
+config = FusionConfig(
+    prefer_pycaret=True,
+    cv_splits=3,
+    n_estimators=200,
+    use_sparse_onehot=True,
+)
+
+result = fuse_datasets(df_a=A, df_b=B, config=config)
+print(result.fused)
+print(result.metrics_a_to_b)
+</code></pre>
+<h3 id="fusionconfig"><code>FusionConfig</code></h3>
+<p>Configuration class for advanced tuning.</p>
+<pre><code class="language-python">from datafusion_ml.config import FusionConfig
+
+config = FusionConfig(
+    prefer_pycaret: bool = True,
+    random_state: int = 42,
+    cv_splits: int = 3,
+    n_estimators: int = 300,
+    n_jobs: int = 1,
+    use_sparse_onehot: bool = True,
+    max_category_cardinality: int = 100,
+    warn_on_high_cardinality: bool = True,
+)
+</code></pre>
+<h4 id="parameters_1">Parameters</h4>
+<ul>
+<li><strong>prefer_pycaret</strong> (<code>bool</code>): Use PyCaret if available, otherwise fall back to scikit-learn</li>
+<li><strong>random_state</strong> (<code>int</code>): Random seed for reproducibility</li>
+<li><strong>cv_splits</strong> (<code>int</code>): Number of cross-validation splits (default: <code>3</code>)</li>
+<li><strong>n_estimators</strong> (<code>int</code>): Number of estimators for ensemble models (default: <code>300</code>)</li>
+<li><strong>n_jobs</strong> (<code>int</code>): Number of parallel jobs (default: <code>1</code>)</li>
+<li><strong>use_sparse_onehot</strong> (<code>bool</code>): Use sparse one-hot encoding for categorical features (default: <code>True</code>). Recommended for high-cardinality features</li>
+<li><strong>max_category_cardinality</strong> (<code>int</code>): Maximum number of unique categories before warning (default: <code>100</code>)</li>
+<li><strong>warn_on_high_cardinality</strong> (<code>bool</code>): Emit warnings for high-cardinality categorical features (default: <code>True</code>)</li>
+</ul>
+<h2 id="rest-api">REST API</h2>
+<h3 id="post-v1fuse">POST <code>/v1/fuse</code></h3>
+<p>Synchronously fuse two datasets.</p>
+<p><strong>Request Body:</strong></p>
+<pre><code class="language-json">{
+  &quot;df_a&quot;: [{&quot;age_group&quot;: &quot;18-29&quot;, &quot;x_only_in_a&quot;: 1}],
+  &quot;df_b&quot;: [{&quot;age_group&quot;: &quot;18-29&quot;, &quot;y_only_in_b&quot;: 3.2}],
+  &quot;overlap_features&quot;: null,
+  &quot;targets_from_a&quot;: null,
+  &quot;targets_from_b&quot;: null,
+  &quot;prefer_pycaret&quot;: true,
+  &quot;random_state&quot;: 42,
+  &quot;cv_splits&quot;: 3,
+  &quot;n_estimators&quot;: 300,
+  &quot;use_sparse_onehot&quot;: true,
+  &quot;max_category_cardinality&quot;: 100,
+  &quot;warn_on_high_cardinality&quot;: true,
+  &quot;return_parts&quot;: null,
+  &quot;row_limit&quot;: null,
+  &quot;columns_include&quot;: null,
+  &quot;columns_exclude&quot;: null
+}
+</code></pre>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;fused&quot;: [{&quot;age_group&quot;: &quot;18-29&quot;, &quot;x_only_in_a&quot;: 1, &quot;y_only_in_b&quot;: 3.2}],
+  &quot;a_enriched&quot;: [{&quot;age_group&quot;: &quot;18-29&quot;, &quot;x_only_in_a&quot;: 1, &quot;y_only_in_b&quot;: 3.2}],
+  &quot;b_enriched&quot;: [{&quot;age_group&quot;: &quot;18-29&quot;, &quot;x_only_in_a&quot;: 1, &quot;y_only_in_b&quot;: 3.2}],
+  &quot;metrics_a_to_b&quot;: {
+    &quot;y_only_in_b&quot;: {&quot;r2&quot;: 0.85, &quot;rmse&quot;: 0.5, &quot;mae&quot;: 0.3}
+  },
+  &quot;metrics_b_to_a&quot;: {
+    &quot;x_only_in_a&quot;: {&quot;accuracy&quot;: 0.9, &quot;f1_macro&quot;: 0.88, &quot;roc_auc_ovr&quot;: 0.92}
+  }
+}
+</code></pre>
+<h3 id="post-v1fuseasync">POST <code>/v1/fuse/async</code></h3>
+<p>Asynchronously fuse two datasets (returns job ID).</p>
+<h3 id="get-v1fuseasyncjob_id">GET <code>/v1/fuse/async/{job_id}</code></h3>
+<p>Get status and results of an async fusion job.</p>
+<h3 id="post-v1fuseupload">POST <code>/v1/fuse/upload</code></h3>
+<p>Upload CSV or Parquet files for fusion.</p>
+<p><strong>Request:</strong> <code>multipart/form-data</code> with <code>file_a</code> and <code>file_b</code></p>
+<h3 id="get-v1health">GET <code>/v1/health</code></h3>
+<p>Health check endpoint.</p>
+<h3 id="get-metrics">GET <code>/metrics</code></h3>
+<p>Prometheus metrics endpoint.</p>
+<p>See the <a href="../deployment/">Deployment Guide</a> for API configuration and security options.</p>
 
 
 
