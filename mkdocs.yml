@@ -14,6 +14,7 @@ nav:
       - Quickstart: tutorials/quickstart.md
       - Advanced: tutorials/advanced.md
       - Breast Cancer (sklearn): tutorials/breast_cancer.md
+  - Deployment: deployment.md
 repo_url: https://example.com/datafusion-ml/repo
 plugins:
   - search
